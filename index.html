@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>🏆 학교 골든벨</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%94%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" defer></script>
+<style>
+  :root{
+    --gold:#E8B923;
+    --gold-deep:#B8860B;
+    --gold-soft:#FBE7A1;
+    --navy:#13151F;
+    --navy-soft:#1C2032;
+    --navy-line:rgba(255,255,255,.1);
+    --cream:#FAF6EC;
+    --card:#FFFFFF;
+    --ink:#22242C;
+    --ink-soft:#6B6E7A;
+    --line:#E9E2CF;
+    --green:#1F9D55;
+    --green-soft:#E7F7ED;
+    --red:#DD4B3E;
+    --red-soft:#FDECEA;
+    --amber:#F0A93D;
+    --radius:20px;
+    --radius-sm:13px;
+    --font-body:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    --font-display:'Black Han Sans','Pretendard',sans-serif;
+    --shadow:0 2px 14px rgba(34,30,10,.06);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:var(--font-body);
+    -webkit-tap-highlight-color:transparent;
+    color:var(--ink);
+    min-height:100vh;
+  }
+  body.page-student, body.page-admin{ background:var(--cream); }
+  body.page-goldenbell{ background:var(--navy); color:#fff; overflow-x:hidden; }
+  #app{ min-height:100vh; }
+  button, input, select, textarea{ font-family:inherit; font-size:inherit; }
+  button{ cursor:pointer; border:none; }
+  a{ color:inherit; text-decoration:none; }
+
+  /* ---------- shared ---------- */
+  .fade-in{ animation:fadeIn .35s ease-out; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
+  .pop{ animation:pop .4s ease-out; }
+  @keyframes pop{ 0%{transform:scale(.85);opacity:0;} 60%{transform:scale(1.04);opacity:1;} 100%{transform:scale(1);} }
+  .reveal{ animation:reveal .4s ease-out; }
+  @keyframes reveal{ from{opacity:0; transform:scale(.92);} to{opacity:1; transform:scale(1);} }
+  .spin{ animation:spin .8s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .card{ background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:22px; }
+  .btn{ border-radius:14px; font-weight:700; padding:14px 18px; transition:filter .15s, transform .1s; }
+  .btn:active{ transform:scale(.98); }
+  .btn-gold{ background:var(--gold); color:#3a2c02; }
+  .btn-gold:hover{ filter:brightness(1.05); }
+  .btn-dark{ background:var(--ink); color:#fff; }
+  .btn-ghost{ background:#F1EDE0; color:var(--ink); }
+  .btn-red{ background:var(--red-soft); color:var(--red); }
+  .btn-red-solid{ background:var(--red); color:#fff; }
+  .btn-green{ background:var(--green); color:#fff; }
+  .btn:disabled{ opacity:.5; cursor:not-allowed; }
+  .pill-btn{ padding:11px 6px; border-radius:13px; font-weight:600; font-size:14px; border:2px solid var(--line); background:#fff; color:var(--ink-soft); text-align:center; }
+  .pill-btn.active{ background:var(--gold); border-color:var(--gold); color:#3a2c02; }
+  .input{ width:100%; padding:14px; border-radius:13px; border:2px solid var(--line); outline:none; background:#fff; color:var(--ink); }
+  .input:focus{ border-color:var(--gold); }
+  .label{ display:block; font-weight:700; font-size:15px; margin-bottom:8px; color:var(--ink); }
+  .error-box{ font-size:14px; font-weight:600; color:var(--red); background:var(--red-soft); border:1px solid #F5C9C4; border-radius:13px; padding:12px 14px; }
+  .grid3{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .grid4{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .footer-sign{ text-align:center; font-size:12px; color:var(--ink-soft); opacity:.6; margin-top:28px; letter-spacing:.02em; }
+
+  /* ---------- student page ---------- */
+  .student-wrap{ max-width:460px; margin:0 auto; padding:32px 16px 40px; }
+  .brand{ text-align:center; margin-bottom:4px; font-family:var(--font-display); font-size:24px; letter-spacing:.01em; }
+  .brand-sub{ text-align:center; font-size:13px; color:var(--ink-soft); margin-bottom:22px; }
+  .dots{ display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:20px; }
+  .dot{ height:8px; border-radius:99px; background:var(--line); transition:all .25s; }
+  .dot.current{ width:30px; background:var(--gold); }
+  .dot.done{ width:8px; background:var(--gold-deep); }
+  .choice-idx{ width:28px; height:28px; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:99px; background:#F1EDE0; font-size:13px; font-weight:700; color:var(--ink-soft); }
+  .spinner{ width:32px; height:32px; border:4px solid var(--gold-soft); border-top-color:var(--gold); border-radius:99px; margin:0 auto; }
+  .center-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+
+  /* ---------- admin page ---------- */
+  .admin-wrap{ max-width:1100px; margin:0 auto; padding:22px 16px 60px; }
+  .admin-head{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:16px; }
+  .admin-title{ font-family:var(--font-display); font-size:22px; display:flex; align-items:center; gap:8px; }
+  .live-dot{ display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--green); font-weight:700; }
+  .live-dot span.d{ width:8px; height:8px; border-radius:99px; background:var(--green); animation:pulse 1.6s infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+  .notice{ background:var(--ink); color:#fff; font-size:14px; font-weight:600; border-radius:13px; padding:12px 16px; margin-bottom:12px; display:none; }
+  .stat-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+  @media(min-width:700px){ .stat-grid{ grid-template-columns:repeat(4,1fr);} }
+  .stat-card{ background:#fff; border-radius:16px; box-shadow:var(--shadow); padding:14px 16px; }
+  .stat-label{ font-size:12px; color:var(--ink-soft); }
+  .stat-value{ font-size:24px; font-weight:800; margin-top:2px; }
+  .two-col{ display:grid; grid-template-columns:1fr; gap:14px; margin-top:14px; }
+  @media(min-width:850px){ .two-col{ grid-template-columns:2fr 1fr; } }
+  .bar-row{ display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:7px; }
+  .bar-label{ width:44px; flex-shrink:0; color:var(--ink-soft); }
+  .bar-track{ flex:1; height:10px; border-radius:99px; background:#EFEAD9; overflow:hidden; }
+  .bar-fill{ height:100%; border-radius:99px; background:var(--gold); transition:width .4s; }
+  .bar-val{ width:24px; text-align:right; font-weight:700; color:var(--ink-soft); }
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th{ text-align:left; padding:11px 10px; color:var(--ink-soft); font-weight:700; border-bottom:1px solid var(--line); white-space:nowrap; }
+  td{ padding:11px 10px; border-bottom:1px solid #F3EFE2; vertical-align:top; }
+  tr:hover td{ background:#FCFAF3; }
+  .truncate{ max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .badge{ padding:3px 10px; border-radius:99px; font-size:11px; font-weight:700; }
+  .badge.approved{ background:var(--green-soft); color:var(--green); }
+  .badge.pending{ background:#FEF3DC; color:#946A08; }
+  .table-wrap{ background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); overflow-x:auto; }
+  .empty-box{ background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:44px 20px; text-align:center; color:var(--ink-soft); }
+  .btn-group{ display:flex; gap:8px; flex-wrap:wrap; }
+  .qr-box canvas, .qr-box img{ display:block; }
+
+  /* ---------- goldenbell (quiz) page ---------- */
+  .gb-topbar{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 18px; border-bottom:1px solid var(--navy-line); position:relative; flex-wrap:wrap; }
+  .gb-progress{ display:flex; align-items:center; gap:10px; min-width:150px; }
+  .gb-progress-track{ flex:1; height:8px; background:rgba(255,255,255,.12); border-radius:99px; overflow:hidden; }
+  .gb-progress-fill{ height:100%; background:var(--gold); border-radius:99px; transition:width .5s; }
+  .gb-subject-chip{ padding:7px 16px; border-radius:99px; background:rgba(255,255,255,.1); font-weight:700; }
+  .gb-icon-btn{ width:42px; height:42px; border-radius:99px; background:rgba(255,255,255,.1); color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; }
+  .gb-icon-btn:hover{ background:rgba(255,255,255,.18); }
+  .timer-wrap{ position:relative; width:74px; height:74px; flex-shrink:0; }
+  .timer-svg{ width:74px; height:74px; transform:rotate(-90deg); }
+  .timer-value{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:20px; }
+  .timer-value.urgent{ color:var(--amber); }
+  .timer-none{ display:flex; align-items:center; gap:6px; color:rgba(255,255,255,.6); font-weight:600; font-size:14px; }
+  .gb-settings-panel{ position:absolute; top:60px; right:16px; z-index:30; width:290px; background:#232738; border:1px solid var(--navy-line); border-radius:18px; box-shadow:0 10px 30px rgba(0,0,0,.4); padding:16px; }
+  .gb-body{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:36px 20px; text-align:center; min-height:52vh; }
+  .gb-qnum{ color:var(--gold); font-weight:800; font-size:18px; margin-bottom:10px; letter-spacing:.02em; }
+  .gb-question{ font-family:var(--font-display); font-size:clamp(22px,4vw,40px); max-width:900px; line-height:1.5; margin-bottom:26px; white-space:pre-wrap; }
+  .gb-choices{ display:grid; grid-template-columns:1fr; gap:11px; width:100%; max-width:700px; margin-bottom:22px; }
+  @media(min-width:640px){ .gb-choices{ grid-template-columns:1fr 1fr; } }
+  .gb-choice{ padding:16px 18px; border-radius:15px; font-size:18px; font-weight:700; border:2px solid rgba(255,255,255,.12); background:rgba(255,255,255,.05); display:flex; align-items:center; gap:12px; text-align:left; }
+  .gb-choice.correct{ background:var(--gold); border-color:var(--gold-soft); color:#3a2c02; }
+  .gb-choice-idx{ width:30px; height:30px; flex-shrink:0; border-radius:99px; background:rgba(255,255,255,.15); display:flex; align-items:center; justify-content:center; font-size:14px; }
+  .gb-choice.correct .gb-choice-idx{ background:rgba(0,0,0,.15); }
+  .gb-reveal-btn{ padding:16px 34px; border-radius:18px; background:#fff; color:var(--ink); font-weight:800; font-size:17px; box-shadow:0 8px 24px rgba(0,0,0,.3); }
+  .gb-answer-card{ background:linear-gradient(135deg,var(--gold),var(--gold-deep)); border-radius:20px; padding:20px 26px; max-width:560px; width:100%; color:#3a2c02; }
+  .gb-answer-label{ font-size:13px; font-weight:800; opacity:.75; margin-bottom:4px; }
+  .gb-answer-text{ font-size:24px; font-weight:800; white-space:pre-wrap; }
+  .gb-author{ margin-top:16px; color:rgba(255,255,255,.65); font-size:14px; }
+  .gb-author b{ color:#fff; }
+  .gb-bottombar{ display:flex; align-items:center; justify-content:center; gap:10px; padding:22px; border-top:1px solid var(--navy-line); flex-wrap:wrap; }
+  .gb-nav-btn{ padding:14px 22px; border-radius:14px; background:rgba(255,255,255,.1); color:#fff; font-weight:700; }
+  .gb-nav-btn:disabled{ opacity:.3; }
+  .gb-empty{ min-height:100vh; display:flex; align-items:center; justify-content:center; text-align:center; padding:24px; }
+  .gb-summary{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:50px 20px; text-align:center; }
+  .gb-summary-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; max-width:640px; margin:0 auto 22px; }
+  .gb-summary-box{ background:rgba(255,255,255,.06); border-radius:18px; padding:16px; text-align:left; }
+  .gb-summary-detail{ display:grid; grid-template-columns:1fr; gap:12px; max-width:640px; margin:0 auto; text-align:left; }
+  @media(min-width:640px){ .gb-summary-detail{ grid-template-columns:1fr 1fr; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script type="module">
+/* =========================================================================
+   🏆 학교 골든벨 문제은행 - 단일 HTML 앱
+   화면: 학생(#/), 관리자(#/admin), 골든벨 진행(#/goldenbell)
+   made by m00n
+   ========================================================================= */
+
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, serverTimestamp, doc, updateDoc,
+  deleteDoc, setDoc, query, where, orderBy, onSnapshot, getDocs, writeBatch
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* ---------------- Firebase 초기화 ---------------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyBtqEv1-RNiqKH7m3fLSxeeKUbcXtEzJSM",
+  authDomain: "goldenbell-questionbank.firebaseapp.com",
+  projectId: "goldenbell-questionbank",
+  storageBucket: "goldenbell-questionbank.firebasestorage.app",
+  messagingSenderId: "119679548211",
+  appId: "1:119679548211:web:bc372dd28e64a7292c1c46",
+};
+const fbApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+
+/* ---------------- 전역 상수 ---------------- */
+const SUBJECTS = ["국어", "영어", "수학", "사회", "과학", "역사", "기타"];
+const CLASSES = ["1반", "2반", "3반", "4반", "5반", "6반"];
+const QUESTION_TYPES = { MULTIPLE: "객관식", ESSAY: "서술형" };
+const CHOICE_COUNT = 4;
+const ADMIN_PIN = "2026gwon5";
+const REVEAL_MODES = { FULL_NAME: "실명 공개", NAME_ONLY: "이름만 공개", ANONYMOUS: "익명", AFTER_ANSWER: "정답 공개 후 표시" };
+const TIMER_OPTIONS = [{ label: "제한 없음", value: null }, { label: "10초", value: 10 }, { label: "20초", value: 20 }, { label: "30초", value: 30 }];
+const DEFAULT_QUESTION_COUNT = 20;
+const COLLECTIONS = { QUESTIONS: "questions", SETTINGS: "settings" };
+const STORAGE_KEYS = { STUDENT_DRAFT: "goldenbell_student_draft", STUDENT_INFO: "goldenbell_student_info" };
+const ACTIVE_QUIZ_KEY = "goldenbell_active_quiz";
+const ADMIN_AUTH_KEY = "goldenbell_admin_auth";
+const SUBMITTED_KEY = "goldenbell_submitted_subjects_v1";
+
+const BAD_WORDS = ["시발","씨발","ㅅㅂ","ㅆㅂ","병신","ㅄ","개새끼","새끼","좆","지랄","닥쳐","미친놈","미친년","꺼져","죽어","fuck","shit","bitch"];
+
+/* ---------------- 유틸: localStorage / sessionStorage ---------------- */
+function loadJSON(key, fallback) {
+  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; }
+  catch (e) { return fallback; }
+}
+function saveJSON(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {} }
+function removeKey(key) { try { localStorage.removeItem(key); } catch (e) {} }
+function loadSession(key, fallback) {
+  try { const raw = sessionStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; }
+  catch (e) { return fallback; }
+}
+function saveSession(key, value) { try { sessionStorage.setItem(key, JSON.stringify(value)); } catch (e) {} }
+function esc(str) {
+  return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* ---------------- 금지어 검사 ---------------- */
+function containsBadWord(text) {
+  if (!text) return false;
+  const normalized = text.toLowerCase().replace(/\s/g, "");
+  return BAD_WORDS.some((w) => normalized.includes(w.toLowerCase()));
+}
+function isRepeatedChar(text) {
+  const cleaned = text.replace(/\s/g, "");
+  if (cleaned.length < 4) return false;
+  const counts = {};
+  for (const ch of cleaned) counts[ch] = (counts[ch] || 0) + 1;
+  const maxCount = Math.max(...Object.values(counts));
+  return maxCount / cleaned.length >= 0.6;
+}
+function isSpecialCharOnly(text) {
+  const cleaned = text.replace(/\s/g, "");
+  if (!cleaned) return true;
+  return !/[가-힣a-zA-Z0-9]/.test(cleaned);
+}
+
+/* ---------------- 검증 ---------------- */
+function validateStudentInfo({ studentClass, number, name }) {
+  if (!studentClass) return { valid: false, message: "반을 선택해주세요." };
+  if (!number || !String(number).trim()) return { valid: false, message: "번호를 입력해주세요." };
+  if (!/^\d{1,2}$/.test(String(number).trim())) return { valid: false, message: "번호는 숫자로 입력해주세요." };
+  if (!name || !name.trim()) return { valid: false, message: "이름을 입력해주세요." };
+  if (name.trim().length > 10) return { valid: false, message: "이름이 너무 깁니다." };
+  return { valid: true };
+}
+function validateQuestion({ type, question, answer, choices, correctChoice }) {
+  if (!question || !question.trim()) return { valid: false, message: "문제를 입력해주세요." };
+  const q = question.trim();
+  if (q.length < 5) return { valid: false, message: "문제가 너무 짧습니다. 최소 5자 이상 입력해주세요." };
+  if (isSpecialCharOnly(q)) return { valid: false, message: "문제에 특수문자만 입력할 수 없습니다." };
+  if (isRepeatedChar(q)) return { valid: false, message: "의미 없는 반복 문자는 사용할 수 없습니다." };
+  if (containsBadWord(q)) return { valid: false, message: "문제에 부적절한 단어가 포함되어 있습니다." };
+  if (!answer || !answer.trim()) return { valid: false, message: "답을 입력해주세요." };
+  if (containsBadWord(answer)) return { valid: false, message: "답에 부적절한 단어가 포함되어 있습니다." };
+  if (type === QUESTION_TYPES.MULTIPLE) {
+    if (!choices || choices.length !== CHOICE_COUNT) return { valid: false, message: `보기를 ${CHOICE_COUNT}개 모두 입력해주세요.` };
+    for (let i = 0; i < choices.length; i++) {
+      if (!choices[i] || !choices[i].trim()) return { valid: false, message: `보기${i + 1}을 입력해주세요.` };
+      if (containsBadWord(choices[i])) return { valid: false, message: `보기${i + 1}에 부적절한 단어가 포함되어 있습니다.` };
+    }
+    if (!correctChoice) return { valid: false, message: "정답 번호를 선택해주세요." };
+  }
+  return { valid: true };
+}
+
+/* ---------------- 랜덤 추첨 ---------------- */
+function shuffle(array) {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+function pickRandomQuestions(pool, options) {
+  const { count, scope = "all", scopeValue = "", typeMode = "ratio", multiplePercent = 70 } = options;
+  let scoped = pool;
+  if (scope === "class" && scopeValue) scoped = pool.filter((q) => q.class === scopeValue);
+  else if (scope === "subject" && scopeValue) scoped = pool.filter((q) => q.subject === scopeValue);
+
+  const multipleList = shuffle(scoped.filter((q) => q.type === QUESTION_TYPES.MULTIPLE));
+  const essayList = shuffle(scoped.filter((q) => q.type === QUESTION_TYPES.ESSAY));
+
+  let needMultiple = 0, needEssay = 0;
+  if (typeMode === "multipleOnly") needMultiple = count;
+  else if (typeMode === "essayOnly") needEssay = count;
+  else { needMultiple = Math.round((count * multiplePercent) / 100); needEssay = count - needMultiple; }
+
+  let takenMultiple = multipleList.slice(0, needMultiple);
+  let takenEssay = essayList.slice(0, needEssay);
+  let shortageMultiple = needMultiple - takenMultiple.length;
+  let shortageEssay = needEssay - takenEssay.length;
+
+  if (typeMode === "ratio") {
+    if (shortageMultiple > 0) takenEssay = [...takenEssay, ...essayList.slice(takenEssay.length, takenEssay.length + shortageMultiple)];
+    if (shortageEssay > 0) takenMultiple = [...takenMultiple, ...multipleList.slice(takenMultiple.length, takenMultiple.length + shortageEssay)];
+  }
+  const picked = shuffle([...takenMultiple, ...takenEssay]);
+  return { picked, requested: count, shortage: picked.length < count };
+}
+
+/* ---------------- CSV 다운로드 ---------------- */
+function exportQuestionsToCSV(questions, filename = "questions.csv") {
+  const headers = ["반","번호","이름","과목","유형","문제","답","보기1","보기2","보기3","보기4","정답번호","작성시간","승인여부"];
+  const escapeCSV = (value) => {
+    if (value === null || value === undefined) return "";
+    const str = String(value);
+    if (str.includes(",") || str.includes("\n") || str.includes('"')) return `"${str.replace(/"/g, '""')}"`;
+    return str;
+  };
+  const rows = questions.map((q) => {
+    const choices = q.choices || [];
+    const createdAt = q.createdAt?.toDate ? q.createdAt.toDate().toLocaleString("ko-KR") : "";
+    return [q.class, q.number, q.name, q.subject, q.type, q.question, q.answer,
+      choices[0] || "", choices[1] || "", choices[2] || "", choices[3] || "",
+      q.correctChoice || "", createdAt, q.isApproved ? "승인" : "미승인"].map(escapeCSV);
+  });
+  const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url; link.download = filename;
+  document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/* ---------------- 라우터 ---------------- */
+const app = document.getElementById("app");
+let cleanupFns = [];
+function registerCleanup(fn) { cleanupFns.push(fn); }
+function runCleanup() { cleanupFns.forEach((fn) => { try { fn(); } catch (e) {} }); cleanupFns = []; }
+
+function getRoute() {
+  const hash = location.hash.replace(/^#/, "") || "/";
+  if (hash.startsWith("/admin")) return "admin";
+  if (hash.startsWith("/goldenbell")) return "goldenbell";
+  return "student";
+}
+function render() {
+  runCleanup();
+  const route = getRoute();
+  document.body.className = route === "goldenbell" ? "page-goldenbell" : route === "admin" ? "page-admin" : "page-student";
+  window.scrollTo(0, 0);
+  if (route === "admin") renderAdminPage();
+  else if (route === "goldenbell") renderGoldenBellPage();
+  else renderStudentPage();
+}
+window.addEventListener("hashchange", render);
+window.addEventListener("DOMContentLoaded", render);
+
+/* =========================================================================
+   학생 화면
+   ========================================================================= */
+function emptyQuestion() {
+  return { subject: "", type: QUESTION_TYPES.MULTIPLE, question: "", answer: "", choices: ["", "", "", ""], correctChoice: "" };
+}
+function renderStudentPage() {
+  let studentInfo = loadJSON(STORAGE_KEYS.STUDENT_INFO, { studentClass: "", number: "", name: "" });
+  let draft = loadJSON(STORAGE_KEYS.STUDENT_DRAFT, emptyQuestion());
+  let step = "info";
+  let error = "";
+  let submitting = false;
+  let lastSubmitted = null;
+
+  app.innerHTML = `<div class="center-screen"><div class="spinner spin"></div></div>`;
+
+  const settingsRef = doc(db, COLLECTIONS.SETTINGS, "general");
+  const unsub = onSnapshot(settingsRef, (snap) => {
+    const isOpen = snap.exists() ? snap.data().isSubmissionOpen !== false : true;
+    paint(isOpen);
+  }, () => paint(true));
+  registerCleanup(unsub);
+
+  function paint(submissionOpen) {
+    if (!submissionOpen) {
+      app.innerHTML = `<div class="center-screen"><div class="fade-in" style="text-align:center;max-width:340px;">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+          <a href="#/admin" class="btn btn-ghost" style="padding:8px 14px;font-size:12px;font-weight:700;">👩‍🏫 관리자 화면</a>
+        </div>
+        <div style="font-size:52px;margin-bottom:12px;">🔔</div>
+        <h1 style="font-size:19px;font-weight:800;">현재 문제 접수가 종료되었습니다.</h1>
+        <p style="color:var(--ink-soft);margin-top:8px;">선생님께서 접수를 다시 열면 이용하실 수 있어요.</p>
+      </div></div>`;
+      return;
+    }
+    app.innerHTML = `
+      <div class="student-wrap">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:-6px;">
+          <a href="#/admin" class="btn btn-ghost" style="padding:8px 14px;font-size:12px;font-weight:700;">👩‍🏫 관리자 화면</a>
+        </div>
+        <div class="brand">🏆 학교 골든벨 문제 제출</div>
+        <p class="brand-sub">내가 낸 문제가 골든벨 퀴즈에 나올 수 있어요!</p>
+        <div class="dots" id="dots"></div>
+        <div class="card" id="step-container"></div>
+        <p class="footer-sign">made by m00n</p>
+      </div>`;
+    paintDots();
+    paintStep();
+  }
+
+  function paintDots() {
+    const order = ["info", "question", "success"];
+    const idx = order.indexOf(step);
+    document.getElementById("dots").innerHTML = order.map((s, i) => {
+      const cls = step === s ? "current" : i < idx ? "done" : "";
+      return `<div class="dot ${cls}"></div>`;
+    }).join("");
+  }
+
+  function paintStep() {
+    const el = document.getElementById("step-container");
+    if (step === "info") el.innerHTML = infoStepHTML();
+    else if (step === "question") el.innerHTML = questionStepHTML();
+    else el.innerHTML = successStepHTML();
+    bindStepEvents();
+  }
+
+  function infoStepHTML() {
+    return `
+      <div class="fade-in" style="display:flex;flex-direction:column;gap:20px;">
+        <div>
+          <label class="label">반</label>
+          <div class="grid3">
+            ${CLASSES.map((c) => `<button type="button" class="pill-btn ${studentInfo.studentClass === c ? "active" : ""}" data-class="${c}">${c}</button>`).join("")}
+          </div>
+        </div>
+        <div>
+          <label class="label">번호</label>
+          <input class="input" type="number" inputmode="numeric" id="num-input" placeholder="번호를 입력하세요" value="${esc(studentInfo.number)}">
+        </div>
+        <div>
+          <label class="label">이름</label>
+          <input class="input" type="text" id="name-input" placeholder="이름을 입력하세요" value="${esc(studentInfo.name)}">
+        </div>
+        ${error ? `<p class="error-box">${esc(error)}</p>` : ""}
+        <button class="btn btn-gold" id="next-btn" style="width:100%;">다음</button>
+      </div>`;
+  }
+
+  function questionStepHTML() {
+    const isMultiple = draft.type === QUESTION_TYPES.MULTIPLE;
+    return `
+      <div class="fade-in" style="display:flex;flex-direction:column;gap:20px;">
+        <div>
+          <label class="label">과목</label>
+          <div class="grid4">
+            ${SUBJECTS.map((s) => `<button type="button" class="pill-btn subj-btn ${draft.subject === s ? "active" : ""}" data-subject="${s}">${s}</button>`).join("")}
+          </div>
+        </div>
+        <div>
+          <label class="label">문제 유형</label>
+          <div class="grid3" style="grid-template-columns:1fr 1fr;">
+            ${Object.values(QUESTION_TYPES).map((t) => `
+              <label class="pill-btn type-radio ${draft.type === t ? "active" : ""}" style="display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;">
+                <input type="radio" name="qtype" value="${t}" ${draft.type === t ? "checked" : ""} style="accent-color:var(--gold);">
+                ${t}
+              </label>`).join("")}
+          </div>
+        </div>
+        <div>
+          <label class="label">문제</label>
+          <textarea class="input" id="q-input" rows="4" placeholder="문제를 입력하세요" style="resize:vertical;">${esc(draft.question)}</textarea>
+        </div>
+        ${isMultiple ? `
+        <div>
+          <label class="label">보기</label>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            ${Array.from({ length: CHOICE_COUNT }).map((_, i) => `
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="choice-idx">${i + 1}</span>
+                <input class="input choice-input" data-idx="${i}" type="text" placeholder="보기 ${i + 1}" value="${esc(draft.choices[i] || "")}">
+              </div>`).join("")}
+          </div>
+          <label class="label" style="margin-top:12px;">정답 번호</label>
+          <div class="grid4">
+            ${Array.from({ length: CHOICE_COUNT }).map((_, i) => `<button type="button" class="pill-btn correct-btn ${draft.correctChoice === String(i + 1) ? "active" : ""}" data-idx="${i + 1}">${i + 1}</button>`).join("")}
+          </div>
+        </div>` : ""}
+        <div>
+          <label class="label">${isMultiple ? "정답 (텍스트)" : "모범 답안"}</label>
+          <textarea class="input" id="a-input" rows="${isMultiple ? 2 : 3}" placeholder="${isMultiple ? "정답 내용을 입력하세요" : "모범 답안을 입력하세요"}" style="resize:vertical;">${esc(draft.answer)}</textarea>
+        </div>
+        ${error ? `<p class="error-box fade-in">${esc(error)}</p>` : ""}
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost" id="prev-btn" style="flex:1;">이전</button>
+          <button class="btn btn-gold" id="submit-btn" style="flex:2;display:flex;align-items:center;justify-content:center;gap:8px;" ${submitting ? "disabled" : ""}>
+            ${submitting ? `<span class="spinner spin" style="width:16px;height:16px;border-width:2px;"></span>` : ""}
+            ${submitting ? "제출 중..." : "제출하기"}
+          </button>
+        </div>
+      </div>`;
+  }
+
+  function successStepHTML() {
+    if (!lastSubmitted) return "";
+    return `
+      <div class="pop" style="text-align:center;padding:14px 0;">
+        <div style="width:64px;height:64px;margin:0 auto 16px;border-radius:99px;background:var(--green-soft);display:flex;align-items:center;justify-content:center;font-size:30px;">✅</div>
+        <h2 style="font-size:18px;font-weight:800;">문제가 성공적으로 등록되었습니다!</h2>
+        <div style="margin-top:18px;background:var(--cream);border-radius:14px;padding:16px;text-align:left;font-size:14px;color:var(--ink-soft);display:flex;flex-direction:column;gap:5px;">
+          <p>제출 과목: <b style="color:var(--ink);">${esc(lastSubmitted.subject)}</b></p>
+          <p>제출 시간: <b style="color:var(--ink);">${lastSubmitted.submittedAt.toLocaleTimeString("ko-KR")}</b></p>
+          <p>문제 미리보기: <b style="color:var(--ink);">${esc(lastSubmitted.questionPreview)}...</b></p>
+        </div>
+        <button class="btn btn-gold" id="another-btn" style="width:100%;margin-top:22px;">다른 과목 문제 추가로 제출하기</button>
+      </div>`;
+  }
+
+  function bindStepEvents() {
+    if (step === "info") {
+      document.querySelectorAll("[data-class]").forEach((b) => b.onclick = () => {
+        studentInfo.studentClass = b.dataset.class; saveJSON(STORAGE_KEYS.STUDENT_INFO, studentInfo);
+        document.querySelectorAll("[data-class]").forEach((x) => x.classList.toggle("active", x === b));
+      });
+      document.getElementById("num-input").oninput = (e) => { studentInfo.number = e.target.value; saveJSON(STORAGE_KEYS.STUDENT_INFO, studentInfo); };
+      document.getElementById("name-input").oninput = (e) => { studentInfo.name = e.target.value; saveJSON(STORAGE_KEYS.STUDENT_INFO, studentInfo); };
+      document.getElementById("next-btn").onclick = () => {
+        const result = validateStudentInfo(studentInfo);
+        if (!result.valid) { error = result.message; paintStep(); return; }
+        error = ""; step = "question"; paintDots(); paintStep();
+      };
+    } else if (step === "question") {
+      document.querySelectorAll(".subj-btn").forEach((b) => b.onclick = () => {
+        draft.subject = b.dataset.subject; saveJSON(STORAGE_KEYS.STUDENT_DRAFT, draft);
+        document.querySelectorAll(".subj-btn").forEach((x) => x.classList.toggle("active", x === b));
+      });
+      document.querySelectorAll('input[name="qtype"]').forEach((r) => r.onchange = () => {
+        draft.type = r.value; draft.choices = ["", "", "", ""]; draft.correctChoice = "";
+        saveJSON(STORAGE_KEYS.STUDENT_DRAFT, draft); error = ""; paintStep();
+      });
+      document.getElementById("q-input").oninput = (e) => { draft.question = e.target.value; saveJSON(STORAGE_KEYS.STUDENT_DRAFT, draft); };
+      document.getElementById("a-input").oninput = (e) => { draft.answer = e.target.value; saveJSON(STORAGE_KEYS.STUDENT_DRAFT, draft); };
+      document.querySelectorAll(".choice-input").forEach((inp) => inp.oninput = (e) => {
+        draft.choices[Number(inp.dataset.idx)] = e.target.value; saveJSON(STORAGE_KEYS.STUDENT_DRAFT, draft);
+      });
+      document.querySelectorAll(".correct-btn").forEach((b) => b.onclick = () => {
+        draft.correctChoice = b.dataset.idx; saveJSON(STORAGE_KEYS.STUDENT_DRAFT, draft);
+        document.querySelectorAll(".correct-btn").forEach((x) => x.classList.toggle("active", x === b));
+      });
+      document.getElementById("prev-btn").onclick = () => { step = "info"; paintDots(); paintStep(); };
+      document.getElementById("submit-btn").onclick = handleSubmit;
+    } else if (step === "success") {
+      document.getElementById("another-btn").onclick = () => { step = "question"; error = ""; paintDots(); paintStep(); };
+    }
+  }
+
+  function getSubmittedKey({ studentClass, number, name, subject }) {
+    return `${studentClass}-${number}-${name.trim()}-${subject}`;
+  }
+
+  async function handleSubmit() {
+    if (submitting) return;
+    if (!draft.subject) { error = "과목을 선택해주세요."; paintStep(); return; }
+    const result = validateQuestion(draft);
+    if (!result.valid) { error = result.message; paintStep(); return; }
+
+    const submittedKey = getSubmittedKey({ ...studentInfo, subject: draft.subject });
+    let submittedList = [];
+    try { submittedList = JSON.parse(localStorage.getItem(SUBMITTED_KEY) || "[]"); } catch (e) { submittedList = []; }
+    if (submittedList.includes(submittedKey)) { error = `이미 ${draft.subject} 과목의 문제를 제출했습니다.`; paintStep(); return; }
+
+    submitting = true; error = ""; paintStep();
+    try {
+      await addDoc(collection(db, COLLECTIONS.QUESTIONS), {
+        class: studentInfo.studentClass, number: studentInfo.number, name: studentInfo.name.trim(),
+        subject: draft.subject, type: draft.type, question: draft.question.trim(), answer: draft.answer.trim(),
+        choices: draft.type === QUESTION_TYPES.MULTIPLE ? draft.choices : [],
+        correctChoice: draft.type === QUESTION_TYPES.MULTIPLE ? draft.correctChoice : "",
+        createdAt: serverTimestamp(), isApproved: false, isDeleted: false,
+      });
+      submittedList.push(submittedKey);
+      localStorage.setItem(SUBMITTED_KEY, JSON.stringify(submittedList));
+      lastSubmitted = { subject: draft.subject, questionPreview: draft.question.trim().slice(0, 30), submittedAt: new Date() };
+      removeKey(STORAGE_KEYS.STUDENT_DRAFT);
+      draft = emptyQuestion();
+      step = "success";
+      paintDots(); paintStep();
+    } catch (err) {
+      console.error("Firestore 저장 오류:", err);
+      error = "제출 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+      paintStep();
+    } finally {
+      submitting = false;
+    }
+  }
+}
+
+/* =========================================================================
+   관리자 화면
+   ========================================================================= */
+function renderAdminPage() {
+  const authed = sessionStorage.getItem(ADMIN_AUTH_KEY) === "true";
+  if (!authed) { renderPinGate(); return; }
+  renderAdminDashboard();
+}
+
+function renderPinGate() {
+  app.innerHTML = `
+    <div class="center-screen">
+      <form id="pin-form" class="card fade-in" style="width:100%;max-width:300px;display:flex;flex-direction:column;gap:14px;">
+        <h1 style="font-size:18px;font-weight:800;text-align:center;">관리자 인증</h1>
+        <input class="input" type="password" id="pin-input" placeholder="PIN 번호 입력" autocomplete="off" autofocus style="text-align:center;letter-spacing:.15em;">
+        <p class="error-box" id="pin-error" style="display:none;text-align:center;"></p>
+        <button type="submit" class="btn btn-gold" style="width:100%;">입장하기</button>
+      </form>
+    </div>`;
+  const errEl = document.getElementById("pin-error");
+  document.getElementById("pin-form").onsubmit = (e) => {
+    e.preventDefault();
+    const pin = document.getElementById("pin-input").value;
+    if (pin === ADMIN_PIN) { sessionStorage.setItem(ADMIN_AUTH_KEY, "true"); render(); }
+    else { errEl.textContent = "PIN 번호가 올바르지 않습니다."; errEl.style.display = "block"; }
+  };
+}
+
+function renderAdminDashboard() {
+  let questions = [];
+  let loading = true;
+  let loadErr = null;
+  let submissionOpen = true;
+  let toggling = false;
+  let filters = { search: "", studentClass: "", subject: "", type: "", approval: "" };
+  let busyId = null;
+
+  // 랜덤 추첨 패널 상태
+  const draw = { count: DEFAULT_QUESTION_COUNT, customCount: "", scope: "all", scopeValue: "", typeMode: "ratio", multiplePercent: 70, result: null };
+
+  app.innerHTML = `
+    <div class="admin-wrap">
+      <div class="admin-head">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="admin-title">🏆 골든벨 관리자</div>
+          <span class="live-dot" id="live-dot" style="display:none;"><span class="d"></span>실시간 업데이트 중</span>
+        </div>
+        <div class="btn-group">
+          <a href="#draw-panel" class="btn btn-gold" style="padding:10px 14px;font-size:13px;">골든벨 시작하기</a>
+          <button class="btn btn-ghost" id="logout-btn" style="padding:10px 14px;font-size:13px;">로그아웃</button>
+        </div>
+      </div>
+
+      <div class="notice" id="notice"></div>
+
+      <div class="two-col">
+        <div id="stats-container"></div>
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div class="card" id="submission-toggle-container"></div>
+          <div class="card qr-box">
+            <p style="font-weight:700;font-size:14px;margin:0 0 10px;">학생 접속 QR코드</p>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+              <div id="qr-canvas" style="padding:10px;background:#fff;border:1px solid var(--line);border-radius:14px;"></div>
+              <p id="qr-url" style="font-size:11px;color:var(--ink-soft);word-break:break-all;text-align:center;"></p>
+              <div style="display:flex;gap:8px;width:100%;">
+                <button class="btn btn-ghost" id="copy-url-btn" style="flex:1;font-size:12px;padding:9px;">URL 복사</button>
+                <button class="btn btn-gold" id="dl-qr-btn" style="flex:1;font-size:12px;padding:9px;">QR 다운로드</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="draw-panel" style="margin-top:14px;"></div>
+
+      <div class="card" style="margin-top:14px;display:flex;flex-direction:column;gap:12px;">
+        <input class="input" id="filter-search" placeholder="이름 또는 문제 내용 검색" style="font-size:14px;padding:12px;">
+        <div class="grid4">
+          <select class="input" id="filter-class" style="padding:10px;font-size:13px;"><option value="">전체 반</option>${CLASSES.map((c) => `<option value="${c}">${c}</option>`).join("")}</select>
+          <select class="input" id="filter-subject" style="padding:10px;font-size:13px;"><option value="">전체 과목</option>${SUBJECTS.map((s) => `<option value="${s}">${s}</option>`).join("")}</select>
+          <select class="input" id="filter-type" style="padding:10px;font-size:13px;"><option value="">전체 유형</option>${Object.values(QUESTION_TYPES).map((t) => `<option value="${t}">${t}</option>`).join("")}</select>
+          <select class="input" id="filter-approval" style="padding:10px;font-size:13px;"><option value="">전체 승인여부</option><option value="approved">승인</option><option value="pending">미승인</option></select>
+        </div>
+        <p style="font-size:12px;color:var(--ink-soft);margin:0;" id="result-count"></p>
+      </div>
+
+      <div class="btn-group" style="margin-top:12px;">
+        <button class="btn btn-dark" id="csv-btn" style="font-size:13px;padding:11px 16px;">📥 CSV 다운로드 (현재 조회 결과)</button>
+        <button class="btn btn-red" id="delete-class-btn" style="font-size:13px;padding:11px 16px;">🗑 선택한 반 전체 삭제 (필터의 반 기준)</button>
+      </div>
+
+      <div id="table-container" style="margin-top:12px;"></div>
+    </div>`;
+
+  // QR 코드
+  const studentUrl = `${window.location.origin}${window.location.pathname}#/`;
+  document.getElementById("qr-url").textContent = studentUrl;
+  try { new QRCode(document.getElementById("qr-canvas"), { text: studentUrl, width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M }); } catch (e) {}
+  document.getElementById("copy-url-btn").onclick = async () => {
+    try { await navigator.clipboard.writeText(studentUrl); showNotice("URL을 복사했습니다."); } catch (e) {}
+  };
+  document.getElementById("dl-qr-btn").onclick = () => {
+    const canvas = document.querySelector("#qr-canvas canvas");
+    if (!canvas) return;
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/png"); link.download = "goldenbell-qrcode.png";
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  };
+
+  document.getElementById("logout-btn").onclick = () => { sessionStorage.removeItem(ADMIN_AUTH_KEY); render(); };
+
+  let noticeTimer = null;
+  function showNotice(msg) {
+    const el = document.getElementById("notice");
+    el.textContent = msg; el.style.display = "block";
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(() => { el.style.display = "none"; }, 2200);
+  }
+
+  /* ---- 통계 ---- */
+  function renderStats() {
+    const total = questions.length;
+    const approved = questions.filter((q) => q.isApproved).length;
+    const pending = total - approved;
+    const studentSet = new Set(questions.map((q) => `${q.class}-${q.number}-${q.name}`));
+    const byClass = CLASSES.map((c) => ({ label: c, value: questions.filter((q) => q.class === c).length }));
+    let bySubject = SUBJECTS.map((s) => ({ label: s, value: questions.filter((q) => q.subject === s).length })).filter((d) => d.value > 0);
+    if (bySubject.length === 0) bySubject = SUBJECTS.map((s) => ({ label: s, value: 0 }));
+    const maxClass = Math.max(...byClass.map((d) => d.value), 1);
+    const maxSubject = Math.max(...bySubject.map((d) => d.value), 1);
+
+    document.getElementById("stats-container").innerHTML = `
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">전체 문제 수</div><div class="stat-value">${total}</div></div>
+        <div class="stat-card"><div class="stat-label">승인된 문제 수</div><div class="stat-value" style="color:var(--green);">${approved}</div></div>
+        <div class="stat-card"><div class="stat-label">미승인 문제 수</div><div class="stat-value" style="color:#946A08;">${pending}</div></div>
+        <div class="stat-card"><div class="stat-label">참여 학생 수</div><div class="stat-value" style="color:var(--gold-deep);">${studentSet.size}</div></div>
+      </div>
+      <div class="two-col" style="grid-template-columns:1fr 1fr;">
+        <div class="card">
+          <p style="font-weight:700;font-size:14px;margin:0 0 10px;">반별 참여(제출) 수</p>
+          ${byClass.map((d) => `<div class="bar-row"><span class="bar-label">${d.label}</span><div class="bar-track"><div class="bar-fill" style="width:${(d.value / maxClass) * 100}%;"></div></div><span class="bar-val">${d.value}</span></div>`).join("")}
+        </div>
+        <div class="card">
+          <p style="font-weight:700;font-size:14px;margin:0 0 10px;">과목별 문제 수</p>
+          ${bySubject.map((d) => `<div class="bar-row"><span class="bar-label">${d.label}</span><div class="bar-track"><div class="bar-fill" style="width:${(d.value / maxSubject) * 100}%;background:var(--green);"></div></div><span class="bar-val">${d.value}</span></div>`).join("")}
+        </div>
+      </div>`;
+    const poolCount = document.getElementById("approved-pool-count");
+    if (poolCount) poolCount.textContent = questions.filter((q) => q.isApproved).length;
+  }
+
+  /* ---- 제출 마감 토글 ---- */
+  function renderToggle() {
+    document.getElementById("submission-toggle-container").innerHTML = `
+      <p style="font-weight:700;font-size:14px;margin:0 0 10px;">학생 제출 상태</p>
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-weight:800;font-size:14px;color:${submissionOpen ? "var(--green)" : "var(--red)"};">${submissionOpen ? "제출 가능" : "제출 마감"}</span>
+        <button class="btn ${submissionOpen ? "btn-red-solid" : "btn-green"}" id="toggle-submission-btn" style="padding:9px 16px;font-size:12px;" ${toggling ? "disabled" : ""}>${submissionOpen ? "마감하기" : "다시 열기"}</button>
+      </div>`;
+    document.getElementById("toggle-submission-btn").onclick = async () => {
+      toggling = true; renderToggle();
+      try {
+        await setDoc(doc(db, COLLECTIONS.SETTINGS, "general"), { isSubmissionOpen: !submissionOpen }, { merge: true });
+        showNotice(!submissionOpen ? "제출을 다시 열었습니다." : "제출을 마감했습니다.");
+      } catch (err) { console.error(err); showNotice("설정 변경 중 오류가 발생했습니다."); }
+      finally { toggling = false; renderToggle(); }
+    };
+  }
+
+  /* ---- 랜덤 추첨 패널 ---- */
+  function renderDrawPanel() {
+    const approvedPool = questions.filter((q) => q.isApproved);
+    document.getElementById("draw-panel").innerHTML = `
+      <div class="card" style="display:flex;flex-direction:column;gap:16px;">
+        <div>
+          <p style="font-weight:700;font-size:14px;margin:0 0 3px;">🎲 랜덤 문제 추첨</p>
+          <p style="font-size:12px;color:var(--ink-soft);margin:0;">승인된 문제 <span id="approved-pool-count">${approvedPool.length}</span>개 중에서 조건에 맞게 추첨합니다.</p>
+        </div>
+        <div>
+          <p style="font-size:12px;font-weight:700;color:var(--ink-soft);margin:0 0 8px;">문항 수</p>
+          <div class="btn-group" data-group="count" style="align-items:center;">
+            ${[10, 20, 30].map((n) => `<button type="button" class="pill-btn count-btn ${draw.count === n && !draw.customCount ? "active" : ""}" data-count="${n}" style="width:auto;padding:10px 16px;">${n}문항</button>`).join("")}
+            <input class="input" type="number" min="1" id="custom-count" placeholder="직접 입력" style="width:110px;padding:10px;font-size:13px;">
+          </div>
+        </div>
+        <div>
+          <p style="font-size:12px;font-weight:700;color:var(--ink-soft);margin:0 0 8px;">추출 범위</p>
+          <div class="btn-group" data-group="scope" style="align-items:center;">
+            <button type="button" class="pill-btn scope-btn ${draw.scope === "all" ? "active" : ""}" data-scope="all" style="width:auto;padding:10px 16px;">전체</button>
+            <button type="button" class="pill-btn scope-btn ${draw.scope === "class" ? "active" : ""}" data-scope="class" style="width:auto;padding:10px 16px;">특정 반</button>
+            <button type="button" class="pill-btn scope-btn ${draw.scope === "subject" ? "active" : ""}" data-scope="subject" style="width:auto;padding:10px 16px;">특정 과목</button>
+            <select class="input" id="scope-class-select" style="width:auto;padding:9px;font-size:13px;display:${draw.scope === "class" ? "inline-block" : "none"};">
+              <option value="">반 선택</option>${CLASSES.map((c) => `<option value="${c}" ${draw.scopeValue === c ? "selected" : ""}>${c}</option>`).join("")}
+            </select>
+            <select class="input" id="scope-subject-select" style="width:auto;padding:9px;font-size:13px;display:${draw.scope === "subject" ? "inline-block" : "none"};">
+              <option value="">과목 선택</option>${SUBJECTS.map((s) => `<option value="${s}" ${draw.scopeValue === s ? "selected" : ""}>${s}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+        <div>
+          <p style="font-size:12px;font-weight:700;color:var(--ink-soft);margin:0 0 8px;">문제 유형</p>
+          <div class="btn-group" data-group="typeMode" style="margin-bottom:8px;">
+            <button type="button" class="pill-btn typemode-btn ${draw.typeMode === "ratio" ? "active" : ""}" data-mode="ratio" style="width:auto;padding:10px 16px;">비율 지정</button>
+            <button type="button" class="pill-btn typemode-btn ${draw.typeMode === "multipleOnly" ? "active" : ""}" data-mode="multipleOnly" style="width:auto;padding:10px 16px;">객관식만</button>
+            <button type="button" class="pill-btn typemode-btn ${draw.typeMode === "essayOnly" ? "active" : ""}" data-mode="essayOnly" style="width:auto;padding:10px 16px;">서술형만</button>
+          </div>
+          <div id="ratio-row" style="display:${draw.typeMode === "ratio" ? "flex" : "none"};align-items:center;gap:12px;">
+            <input type="range" min="0" max="100" step="10" id="ratio-range" value="${draw.multiplePercent}" style="flex:1;accent-color:var(--gold);">
+            <span id="ratio-label" style="font-size:12px;font-weight:600;color:var(--ink-soft);width:150px;text-align:right;">객관식 ${draw.multiplePercent}% / 서술형 ${100 - draw.multiplePercent}%</span>
+          </div>
+        </div>
+        <button class="btn btn-dark" id="draw-btn" style="width:100%;">🎲 추첨하기</button>
+        <div id="draw-result-container"></div>
+      </div>`;
+
+    document.getElementById("custom-count").oninput = (e) => { draw.customCount = e.target.value; };
+    document.querySelectorAll(".count-btn").forEach((b) => b.onclick = () => {
+      draw.count = Number(b.dataset.count); draw.customCount = "";
+      document.getElementById("custom-count").value = "";
+      document.querySelectorAll(".count-btn").forEach((x) => x.classList.toggle("active", x === b));
+    });
+    document.querySelectorAll(".scope-btn").forEach((b) => b.onclick = () => {
+      draw.scope = b.dataset.scope; draw.scopeValue = "";
+      document.querySelectorAll(".scope-btn").forEach((x) => x.classList.toggle("active", x === b));
+      document.getElementById("scope-class-select").style.display = draw.scope === "class" ? "inline-block" : "none";
+      document.getElementById("scope-subject-select").style.display = draw.scope === "subject" ? "inline-block" : "none";
+      document.getElementById("scope-class-select").value = ""; document.getElementById("scope-subject-select").value = "";
+    });
+    document.getElementById("scope-class-select").onchange = (e) => { draw.scopeValue = e.target.value; };
+    document.getElementById("scope-subject-select").onchange = (e) => { draw.scopeValue = e.target.value; };
+    document.querySelectorAll(".typemode-btn").forEach((b) => b.onclick = () => {
+      draw.typeMode = b.dataset.mode;
+      document.querySelectorAll(".typemode-btn").forEach((x) => x.classList.toggle("active", x === b));
+      document.getElementById("ratio-row").style.display = draw.typeMode === "ratio" ? "flex" : "none";
+    });
+    document.getElementById("ratio-range").oninput = (e) => {
+      draw.multiplePercent = Number(e.target.value);
+      document.getElementById("ratio-label").textContent = `객관식 ${draw.multiplePercent}% / 서술형 ${100 - draw.multiplePercent}%`;
+    };
+    document.getElementById("draw-btn").onclick = () => {
+      const effectiveCount = draw.customCount ? Number(draw.customCount) : draw.count;
+      if (!effectiveCount || effectiveCount <= 0) return;
+      const pool = questions.filter((q) => q.isApproved);
+      draw.result = pickRandomQuestions(pool, { count: effectiveCount, scope: draw.scope, scopeValue: draw.scopeValue, typeMode: draw.typeMode, multiplePercent: draw.multiplePercent });
+      renderDrawResult();
+    };
+    renderDrawResult();
+  }
+
+  function renderDrawResult() {
+    const el = document.getElementById("draw-result-container");
+    if (!draw.result) { el.innerHTML = ""; return; }
+    const r = draw.result;
+    el.innerHTML = `
+      <div class="fade-in" style="background:var(--gold-soft);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px;">
+        <p style="font-weight:700;font-size:14px;margin:0;color:var(--gold-deep);">${r.picked.length}문항이 추첨되었습니다. (요청: ${r.requested}문항)</p>
+        ${r.shortage ? `<p style="font-size:12px;color:#946A08;margin:0;">⚠️ 조건에 맞는 문제가 부족해서 요청하신 수보다 적게 추첨되었습니다.</p>` : ""}
+        ${r.picked.length === 0
+          ? `<p style="font-size:12px;color:var(--ink-soft);margin:0;">조건에 맞는 승인된 문제가 없습니다. 조건을 조정해주세요.</p>`
+          : `<button class="btn btn-gold" id="start-gb-btn" style="width:100%;">🏆 이 문제로 골든벨 시작하기</button>`}
+      </div>`;
+    const startBtn = document.getElementById("start-gb-btn");
+    if (startBtn) startBtn.onclick = () => {
+      const quizData = { questions: r.picked, createdAt: new Date().toISOString(), settings: { revealMode: "익명", timerSeconds: null, autoAdvanceOnTimeout: false } };
+      saveSession(ACTIVE_QUIZ_KEY, quizData);
+      location.hash = "/goldenbell";
+    };
+  }
+
+  /* ---- 필터 + 테이블 ---- */
+  function getFilteredQuestions() {
+    return questions.filter((q) => {
+      if (filters.studentClass && q.class !== filters.studentClass) return false;
+      if (filters.subject && q.subject !== filters.subject) return false;
+      if (filters.type && q.type !== filters.type) return false;
+      if (filters.approval === "approved" && !q.isApproved) return false;
+      if (filters.approval === "pending" && q.isApproved) return false;
+      if (filters.search) {
+        const s = filters.search.toLowerCase();
+        if (!(q.name || "").toLowerCase().includes(s) && !(q.question || "").toLowerCase().includes(s)) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderTable() {
+    const filtered = getFilteredQuestions();
+    document.getElementById("result-count").textContent = `검색 결과 ${filtered.length}건`;
+    const container = document.getElementById("table-container");
+    if (loading) { container.innerHTML = `<div class="empty-box">불러오는 중...</div>`; return; }
+    if (loadErr) { container.innerHTML = `<div class="empty-box" style="background:var(--red-soft);color:var(--red);">${esc(loadErr)}</div>`; return; }
+    if (filtered.length === 0) { container.innerHTML = `<div class="empty-box">조건에 맞는 문제가 없습니다.</div>`; return; }
+    container.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>반/번호</th><th>이름</th><th>과목</th><th>유형</th><th>문제</th><th>답</th><th>작성시간</th><th>승인</th><th>관리</th>
+          </tr></thead>
+          <tbody>
+            ${filtered.map((q) => {
+              const createdAt = q.createdAt?.toDate ? q.createdAt.toDate().toLocaleString("ko-KR") : "-";
+              const disabled = busyId === q.id ? "disabled" : "";
+              return `<tr>
+                <td>${esc(q.class)} / ${esc(q.number)}번</td>
+                <td>${esc(q.name)}</td>
+                <td>${esc(q.subject)}</td>
+                <td>${esc(q.type)}</td>
+                <td class="truncate" title="${esc(q.question)}">${esc(q.question)}</td>
+                <td class="truncate" style="max-width:140px;" title="${esc(q.answer)}">${esc(q.answer)}</td>
+                <td style="color:var(--ink-soft);font-size:11px;white-space:nowrap;">${createdAt}</td>
+                <td><span class="badge ${q.isApproved ? "approved" : "pending"}">${q.isApproved ? "승인" : "미승인"}</span></td>
+                <td>
+                  <div style="display:flex;gap:6px;">
+                    ${!q.isApproved ? `<button class="btn btn-gold" data-action="approve" data-id="${q.id}" style="padding:7px 10px;font-size:11px;" ${disabled}>승인</button>` : ""}
+                    <button class="btn btn-red" data-action="delete" data-id="${q.id}" style="padding:7px 10px;font-size:11px;" ${disabled}>삭제</button>
+                  </div>
+                </td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>`;
+    container.querySelectorAll("[data-action]").forEach((btn) => {
+      btn.onclick = async () => {
+        const id = btn.dataset.id;
+        const action = btn.dataset.action;
+        if (action === "delete" && !window.confirm("이 문제를 삭제하시겠습니까? 삭제 후에는 되돌릴 수 없습니다.")) return;
+        busyId = id; renderTable();
+        try {
+          if (action === "approve") { await updateDoc(doc(db, COLLECTIONS.QUESTIONS, id), { isApproved: true }); showNotice("문제를 승인했습니다."); }
+          else { await deleteDoc(doc(db, COLLECTIONS.QUESTIONS, id)); showNotice("문제를 삭제했습니다."); }
+        } catch (err) { console.error(err); showNotice(action === "approve" ? "승인 중 오류가 발생했습니다." : "삭제 중 오류가 발생했습니다."); }
+        finally { busyId = null; }
+      };
+    });
+  }
+
+  document.getElementById("filter-search").oninput = (e) => { filters.search = e.target.value; renderTable(); };
+  document.getElementById("filter-class").onchange = (e) => { filters.studentClass = e.target.value; renderTable(); };
+  document.getElementById("filter-subject").onchange = (e) => { filters.subject = e.target.value; renderTable(); };
+  document.getElementById("filter-type").onchange = (e) => { filters.type = e.target.value; renderTable(); };
+  document.getElementById("filter-approval").onchange = (e) => { filters.approval = e.target.value; renderTable(); };
+
+  document.getElementById("csv-btn").onclick = () => {
+    const filtered = getFilteredQuestions();
+    if (filtered.length === 0) { showNotice("다운로드할 문제가 없습니다."); return; }
+    exportQuestionsToCSV(filtered, `골든벨_문제목록_${new Date().toISOString().slice(0, 10)}.csv`);
+  };
+  document.getElementById("delete-class-btn").onclick = async () => {
+    if (!filters.studentClass) { showNotice("먼저 필터에서 삭제할 반을 선택해주세요."); return; }
+    if (!window.confirm(`${filters.studentClass}의 모든 문제를 삭제하시겠습니까? 되돌릴 수 없습니다.`)) return;
+    try {
+      const q = query(collection(db, COLLECTIONS.QUESTIONS), where("class", "==", filters.studentClass));
+      const snap = await getDocs(q);
+      const batch = writeBatch(db);
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      showNotice(`${filters.studentClass}의 문제를 모두 삭제했습니다.`);
+    } catch (err) { console.error(err); showNotice("반별 삭제 중 오류가 발생했습니다."); }
+  };
+
+  renderDrawPanel();
+  renderToggle();
+  renderStats();
+  renderTable();
+
+  const unsubQuestions = onSnapshot(
+    query(collection(db, COLLECTIONS.QUESTIONS), orderBy("createdAt", "desc")),
+    (snapshot) => {
+      const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      questions = list.filter((item) => !item.isDeleted);
+      loading = false; loadErr = null;
+      document.getElementById("live-dot").style.display = "inline-flex";
+      renderStats(); renderTable();
+    },
+    (err) => { console.error("문제 목록 구독 오류:", err); loadErr = "문제 목록을 불러오는 중 오류가 발생했습니다."; loading = false; renderTable(); }
+  );
+  registerCleanup(unsubQuestions);
+
+  const unsubSettings = onSnapshot(
+    doc(db, COLLECTIONS.SETTINGS, "general"),
+    (snap) => { submissionOpen = snap.exists() ? snap.data().isSubmissionOpen !== false : true; renderToggle(); },
+    () => { submissionOpen = true; renderToggle(); }
+  );
+  registerCleanup(unsubSettings);
+}
+
+/* =========================================================================
+   골든벨 진행 화면
+   ========================================================================= */
+function playBeep() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = "sine"; osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+    osc.start(); osc.stop(ctx.currentTime + 0.6);
+  } catch (err) { console.warn("효과음 재생 실패:", err); }
+}
+function timerHTML(totalSeconds, remainingSeconds) {
+  if (totalSeconds === null || totalSeconds === undefined) return `<div class="timer-none">⏱ 제한 없음</div>`;
+  const radius = 34, circumference = 2 * Math.PI * radius;
+  const ratio = Math.max(0, Math.min(1, remainingSeconds / totalSeconds));
+  const offset = circumference * (1 - ratio);
+  const isUrgent = remainingSeconds <= 5 && remainingSeconds > 0;
+  const isDone = remainingSeconds <= 0;
+  const stroke = isDone ? "#DD4B3E" : isUrgent ? "#F0A93D" : "#E8B923";
+  return `<div class="timer-wrap">
+    <svg viewBox="0 0 80 80" class="timer-svg">
+      <circle cx="40" cy="40" r="${radius}" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="6"/>
+      <circle cx="40" cy="40" r="${radius}" fill="none" stroke="${stroke}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" style="transition:stroke-dashoffset 1s linear, stroke .3s;"/>
+    </svg>
+    <div class="timer-value ${isUrgent ? "urgent" : ""}">${Math.max(0, remainingSeconds)}</div>
+  </div>`;
+}
+function authorText(question, revealMode, answerRevealed) {
+  switch (revealMode) {
+    case REVEAL_MODES.FULL_NAME: return `${question.name} (${question.class} ${question.number}번)`;
+    case REVEAL_MODES.NAME_ONLY: return question.name;
+    case REVEAL_MODES.ANONYMOUS: return `${question.class} ${question.number}번 학생`;
+    case REVEAL_MODES.AFTER_ANSWER: return answerRevealed ? `${question.name} (${question.class} ${question.number}번)` : null;
+    default: return `${question.class} ${question.number}번 학생`;
+  }
+}
+
+function renderGoldenBellPage() {
+  let quizData = loadSession(ACTIVE_QUIZ_KEY, null);
+  let index = 0, revealed = false, finished = false, showSettings = false, timeLeft = null, isFullscreen = !!document.fullscreenElement;
+  let timerInterval = null, hasBeeped = false;
+
+  registerCleanup(() => { if (timerInterval) clearInterval(timerInterval); });
+
+  const questions = quizData?.questions || [];
+  if (!quizData || questions.length === 0) {
+    app.innerHTML = `
+      <div class="gb-empty">
+        <div>
+          <p style="font-size:17px;font-weight:700;margin-bottom:16px;">추첨된 문제 세트가 없습니다.</p>
+          <a href="#/admin" class="btn btn-gold" style="display:inline-block;">관리자 화면에서 먼저 추첨해주세요</a>
+        </div>
+      </div>`;
+    return;
+  }
+
+  function getSettings() { return quizData.settings || { revealMode: "익명", timerSeconds: null, autoAdvanceOnTimeout: false }; }
+
+  function updateSettings(newSettings) {
+    quizData = { ...quizData, settings: newSettings };
+    saveSession(ACTIVE_QUIZ_KEY, quizData);
+    resetTimerForCurrentQuestion();
+    paintTopbar();
+  }
+
+  function resetTimerForCurrentQuestion() {
+    hasBeeped = false;
+    revealed = false;
+    const settings = getSettings();
+    timeLeft = settings.timerSeconds;
+    if (timerInterval) clearInterval(timerInterval);
+    if (settings.timerSeconds !== null && settings.timerSeconds !== undefined && !finished) {
+      timerInterval = setInterval(() => {
+        if (timeLeft === null) return;
+        if (timeLeft <= 1) {
+          timeLeft = 0;
+          if (!hasBeeped) {
+            hasBeeped = true;
+            playBeep();
+            if (settings.autoAdvanceOnTimeout) setTimeout(() => goNext(), 800);
+          }
+        } else timeLeft -= 1;
+        paintTimer();
+      }, 1000);
+    }
+  }
+
+  function goNext() {
+    if (index >= questions.length - 1) { finished = true; paintAll(); return; }
+    index += 1; resetTimerForCurrentQuestion(); paintAll();
+  }
+  function goPrev() { index = Math.max(0, index - 1); resetTimerForCurrentQuestion(); paintAll(); }
+
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+    else document.exitFullscreen?.();
+  }
+  const fsHandler = () => { isFullscreen = !!document.fullscreenElement; paintTopbar(); };
+  document.addEventListener("fullscreenchange", fsHandler);
+  registerCleanup(() => document.removeEventListener("fullscreenchange", fsHandler));
+
+  function paintAll() {
+    if (finished) { paintSummary(); return; }
+    const settings = getSettings();
+    const q = questions[index];
+    const isMultiple = q.type === QUESTION_TYPES.MULTIPLE;
+    const isLast = index === questions.length - 1;
+    app.innerHTML = `
+      <div style="min-height:100vh;display:flex;flex-direction:column;">
+        <div class="gb-topbar" id="gb-topbar"></div>
+        <div class="gb-body" id="gb-question-area"></div>
+        <div class="gb-bottombar">
+          <button class="gb-nav-btn" id="prev-q-btn" ${index === 0 ? "disabled" : ""}>← 이전 문제</button>
+          <button class="gb-nav-btn" id="skip-q-btn">문제 건너뛰기</button>
+          ${isLast
+            ? `<button class="gb-nav-btn" id="finish-btn" style="background:var(--red);">🏁 골든벨 종료</button>`
+            : `<button class="gb-nav-btn" id="next-q-btn" style="background:var(--gold);color:#3a2c02;">다음 문제 →</button>`}
+        </div>
+      </div>`;
+    paintTopbar();
+    paintQuestionArea();
+    document.getElementById("prev-q-btn").onclick = goPrev;
+    document.getElementById("skip-q-btn").onclick = goNext;
+    const nextBtn = document.getElementById("next-q-btn");
+    if (nextBtn) nextBtn.onclick = goNext;
+    const finishBtn = document.getElementById("finish-btn");
+    if (finishBtn) finishBtn.onclick = () => { finished = true; paintAll(); };
+  }
+
+  function paintTopbar() {
+    const settings = getSettings();
+    const q = questions[index];
+    const percent = questions.length > 0 ? ((index + 1) / questions.length) * 100 : 0;
+    document.getElementById("gb-topbar").innerHTML = `
+      <div class="gb-progress">
+        <span style="font-weight:700;white-space:nowrap;">${index + 1} / ${questions.length}</span>
+        <div class="gb-progress-track"><div class="gb-progress-fill" style="width:${percent}%;"></div></div>
+      </div>
+      <div class="gb-subject-chip">${esc(q.subject)}</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span id="gb-timer">${timerHTML(settings.timerSeconds, timeLeft ?? 0)}</span>
+        <button class="gb-icon-btn" id="settings-toggle-btn" title="설정">⚙️</button>
+        <button class="gb-icon-btn" id="fullscreen-btn" title="전체 화면 (ESC로 종료)">${isFullscreen ? "⤡" : "⤢"}</button>
+      </div>
+      ${showSettings ? settingsPanelHTML(settings) : ""}`;
+    document.getElementById("settings-toggle-btn").onclick = () => { showSettings = !showSettings; paintTopbar(); };
+    document.getElementById("fullscreen-btn").onclick = toggleFullscreen;
+    if (showSettings) bindSettingsPanel(settings);
+  }
+
+  function paintTimer() {
+    const settings = getSettings();
+    const el = document.getElementById("gb-timer");
+    if (el) el.innerHTML = timerHTML(settings.timerSeconds, timeLeft ?? 0);
+  }
+
+  function settingsPanelHTML(settings) {
+    return `
+      <div class="gb-settings-panel fade-in">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <p style="font-weight:800;font-size:14px;margin:0;">골든벨 설정</p>
+          <button id="close-settings-btn" style="background:none;color:rgba(255,255,255,.6);font-size:13px;">닫기</button>
+        </div>
+        <div style="margin-bottom:12px;">
+          <p style="font-size:11px;color:rgba(255,255,255,.5);margin:0 0 6px;">출제자 공개 방식</p>
+          <select id="reveal-mode-select" style="width:100%;padding:9px;border-radius:10px;background:#2E3346;color:#fff;border:1px solid var(--navy-line);">
+            ${Object.values(REVEAL_MODES).map((m) => `<option value="${m}" ${settings.revealMode === m ? "selected" : ""}>${m}</option>`).join("")}
+          </select>
+        </div>
+        <div style="margin-bottom:12px;">
+          <p style="font-size:11px;color:rgba(255,255,255,.5);margin:0 0 6px;">타이머</p>
+          <select id="timer-select" style="width:100%;padding:9px;border-radius:10px;background:#2E3346;color:#fff;border:1px solid var(--navy-line);">
+            ${TIMER_OPTIONS.map((opt) => `<option value="${opt.value === null ? "null" : opt.value}" ${settings.timerSeconds === opt.value ? "selected" : ""}>${opt.label}</option>`).join("")}
+          </select>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#ddd;">
+          <input type="checkbox" id="auto-advance-check" ${settings.autoAdvanceOnTimeout ? "checked" : ""} style="accent-color:var(--gold);width:16px;height:16px;">
+          시간 종료 시 자동으로 다음 문제로 이동
+        </label>
+      </div>`;
+  }
+  function bindSettingsPanel(settings) {
+    document.getElementById("close-settings-btn").onclick = () => { showSettings = false; paintTopbar(); };
+    document.getElementById("reveal-mode-select").onchange = (e) => updateSettings({ ...settings, revealMode: e.target.value });
+    document.getElementById("timer-select").onchange = (e) => {
+      const v = e.target.value;
+      updateSettings({ ...settings, timerSeconds: v === "null" ? null : Number(v) });
+    };
+    document.getElementById("auto-advance-check").onchange = (e) => updateSettings({ ...settings, autoAdvanceOnTimeout: e.target.checked });
+  }
+
+  function paintQuestionArea() {
+    const settings = getSettings();
+    const q = questions[index];
+    const isMultiple = q.type === QUESTION_TYPES.MULTIPLE;
+    const authorLine = authorText(q, settings.revealMode, revealed);
+    document.getElementById("gb-question-area").innerHTML = `
+      <div class="fade-in" style="width:100%;display:flex;flex-direction:column;align-items:center;">
+        <p class="gb-qnum">문제 ${index + 1}</p>
+        <p class="gb-question">${esc(q.question)}</p>
+        ${isMultiple ? `
+        <div class="gb-choices">
+          ${(q.choices || []).map((c, i) => `
+            <div class="gb-choice ${revealed && String(i + 1) === q.correctChoice ? "correct pop" : ""}">
+              <span class="gb-choice-idx">${i + 1}</span>${esc(c)}
+            </div>`).join("")}
+        </div>` : ""}
+        ${!revealed
+          ? `<button class="gb-reveal-btn" id="reveal-btn">정답 보기</button>`
+          : `<div class="gb-answer-card reveal">
+               <p class="gb-answer-label">정답</p>
+               ${isMultiple
+                 ? `<p class="gb-answer-text">${esc(q.correctChoice)}번 &nbsp; <span style="font-size:18px;font-weight:600;">${esc((q.choices || [])[Number(q.correctChoice) - 1] || "")}</span></p>`
+                 : `<p class="gb-answer-text">${esc(q.answer)}</p>`}
+             </div>`}
+        <div class="gb-author">${authorLine ? `출제자: <b>${esc(authorLine)}</b>` : "🙈 출제자는 정답 공개 후 표시됩니다"}</div>
+      </div>`;
+    const revealBtn = document.getElementById("reveal-btn");
+    if (revealBtn) revealBtn.onclick = () => { revealed = true; paintQuestionArea(); };
+  }
+
+  function paintSummary() {
+    if (timerInterval) clearInterval(timerInterval);
+    const qs = quizData.questions;
+    const subjectsUsed = [...new Set(qs.map((q) => q.subject))];
+    const studentMap = new Map();
+    qs.forEach((q) => { const key = `${q.class}-${q.number}-${q.name}`; if (!studentMap.has(key)) studentMap.set(key, q); });
+    const students = [...studentMap.values()];
+    const byClass = CLASSES.map((c) => ({ label: c, value: qs.filter((q) => q.class === c).length })).filter((d) => d.value > 0);
+    const bySubject = SUBJECTS.map((s) => ({ label: s, value: qs.filter((q) => q.subject === s).length })).filter((d) => d.value > 0);
+
+    app.innerHTML = `
+      <div class="gb-summary">
+        <div class="fade-in" style="max-width:680px;width:100%;">
+          <div style="font-size:48px;margin-bottom:12px;">🏆</div>
+          <h1 style="font-family:var(--font-display);font-size:clamp(24px,4vw,32px);margin-bottom:26px;">골든벨이 종료되었습니다!</h1>
+          <div class="gb-summary-grid">
+            <div class="gb-summary-box"><p style="color:rgba(255,255,255,.5);font-size:13px;margin:0;">총 문제 수</p><p style="font-size:24px;font-weight:800;margin:4px 0 0;">${qs.length}</p></div>
+            <div class="gb-summary-box"><p style="color:rgba(255,255,255,.5);font-size:13px;margin:0;">출제 학생 수</p><p style="font-size:24px;font-weight:800;margin:4px 0 0;">${students.length}</p></div>
+          </div>
+          <div class="gb-summary-detail">
+            <div class="gb-summary-box"><p style="font-weight:700;font-size:13px;margin:0 0 8px;color:#ddd;">사용한 과목</p><p style="font-size:13px;color:rgba(255,255,255,.6);margin:0;">${esc(subjectsUsed.join(", "))}</p></div>
+            <div class="gb-summary-box"><p style="font-weight:700;font-size:13px;margin:0 0 8px;color:#ddd;">출제 학생 목록</p><p style="font-size:13px;color:rgba(255,255,255,.6);margin:0;max-height:96px;overflow-y:auto;">${esc(students.map((s) => `${s.name}(${s.class} ${s.number}번)`).join(", "))}</p></div>
+            <div class="gb-summary-box"><p style="font-weight:700;font-size:13px;margin:0 0 8px;color:#ddd;">반별 출제 수</p>${byClass.map((d) => `<p style="font-size:13px;color:rgba(255,255,255,.6);margin:0;">${d.label}: ${d.value}문제</p>`).join("")}</div>
+            <div class="gb-summary-box"><p style="font-weight:700;font-size:13px;margin:0 0 8px;color:#ddd;">과목별 출제 수</p>${bySubject.map((d) => `<p style="font-size:13px;color:rgba(255,255,255,.6);margin:0;">${d.label}: ${d.value}문제</p>`).join("")}</div>
+          </div>
+          <button class="btn btn-gold" id="back-to-admin-btn" style="margin-top:28px;padding:15px 30px;">관리자 화면으로 돌아가기</button>
+        </div>
+      </div>`;
+    document.getElementById("back-to-admin-btn").onclick = () => { sessionStorage.removeItem(ACTIVE_QUIZ_KEY); location.hash = "/admin"; };
+  }
+
+  resetTimerForCurrentQuestion();
+  paintAll();
+}
+</script>
+</body>
+</html>
