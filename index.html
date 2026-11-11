@@ -233,6 +233,8 @@
   .gb-answer-card{ background:var(--gold); border-radius:.5em; padding:.8em 1.3em; max-width:min(90vw, 1600px); width:auto; min-width:min(28em, 90vw); color:#2A2208; }
   .gb-answer-label{ font-size:.75em; font-weight:800; opacity:.75; margin-bottom:.2em; }
   .gb-answer-text{ font-size:2em; font-weight:800; white-space:pre-wrap; line-height:1.3; }
+  .gb-accepted{ font-size:1.05em; font-weight:700; margin-top:.35em !important; }
+  .gb-accepted b{ font-size:.75em; background:rgba(0,0,0,.12); border-radius:.3em; padding:.1em .45em; margin-right:.35em; vertical-align:.1em; }
   .gb-author{ margin-top:.8em; color:var(--gb-muted); font-size:.85em; }
   .gb-author b{ color:var(--gb-fg); }
   .gb-bottombar{ display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:.6em; padding:.6em 1em; border-top:1px solid var(--gb-line); }
@@ -551,7 +553,7 @@ function pickRandomQuestions(pool, options) {
 
 /* ---------------- CSV 다운로드 ---------------- */
 function exportQuestionsToCSV(questions, filename = "questions.csv") {
-  const headers = ["반","번호","이름","과목","학년-학기","단원","교과서 쪽수","유형","문제","답","보기1","보기2","보기3","보기4","정답번호","작성시간","승인여부"];
+  const headers = ["반","번호","이름","과목","학년-학기","단원","교과서 쪽수","유형","문제","답","인정 답안","보기1","보기2","보기3","보기4","정답번호","작성시간","승인여부"];
   const escapeCSV = (value) => {
     if (value === null || value === undefined) return "";
     const str = String(value);
@@ -561,7 +563,7 @@ function exportQuestionsToCSV(questions, filename = "questions.csv") {
   const rows = questions.map((q) => {
     const choices = q.choices || [];
     const createdAt = q.createdAt?.toDate ? q.createdAt.toDate().toLocaleString("ko-KR") : "";
-    return [q.class, q.number, q.name, q.subject, q.gradeTerm || "", q.unit || "", q.page || "", q.type, q.question, q.answer,
+    return [q.class, q.number, q.name, q.subject, q.gradeTerm || "", q.unit || "", q.page || "", q.type, q.question, q.answer, acceptedList(q).join(" | "),
       choices[0] || "", choices[1] || "", choices[2] || "", choices[3] || "",
       q.correctChoice || "", createdAt, q.isApproved ? "승인" : "미승인"].map(escapeCSV);
   });
@@ -619,6 +621,7 @@ function csvRowsToQuestions(rows) {
       class: get(r, "반") || "다른 반", number: get(r, "번호"), name: get(r, "이름") || "익명",
       subject, gradeTerm: /^[1-6]-[12]$/.test(get(r, "학년-학기")) ? get(r, "학년-학기") : "", unit: get(r, "단원"), page: PAGE_PATTERN.test(page) ? page : "",
       type, question: question.slice(0, 500), answer: answer.slice(0, 500),
+      acceptedAnswers: type === QUESTION_TYPES.MULTIPLE ? [] : parseAccepted(get(r, "인정 답안").replace(/\s*\|\s*/g, "\n")),
       choices: type === QUESTION_TYPES.MULTIPLE ? choices : [],
       correctChoice: type === QUESTION_TYPES.MULTIPLE ? correctChoice : "",
     });
@@ -712,11 +715,18 @@ onAuthStateChanged(auth, async (user) => {
    학생 화면
    ========================================================================= */
 function emptyQuestion() {
-  return { subject: "", unit: "", page: "", noPage: false, type: QUESTION_TYPES.MULTIPLE, question: "", answer: "", choices: ["", "", "", ""], correctChoice: "" };
+  return { subject: "", unit: "", page: "", noPage: false, accepted: "", noAccepted: false, type: QUESTION_TYPES.MULTIPLE, question: "", answer: "", choices: ["", "", "", ""], correctChoice: "" };
 }
 // 교과서 쪽수: "45" 또는 "45~46" 형태 허용
 const PAGE_PATTERN = /^\d{1,3}(\s*[~\-]\s*\d{1,3})?$/;
 function normalizePage(p) { return String(p || "").trim().replace(/\s*[~\-]\s*/, "~"); }
+// 서술형 '정답으로 인정할 답' (한 줄에 하나 또는 쉼표로 구분해 입력)
+function parseAccepted(text) {
+  return [...new Set(String(text || "").split(/[\n,]/).map((x) => x.trim()).filter(Boolean))].slice(0, 10).map((x) => x.slice(0, 100));
+}
+function acceptedList(q) { return Array.isArray(q && q.acceptedAnswers) ? q.acceptedAnswers.filter(Boolean) : []; }
+// 채점용 비교: 띄어쓰기·문장부호·대소문자 무시
+function normAnswer(x) { return String(x || "").toLowerCase().replace(/[\s.,!?·'"“”‘’()\[\]{}~\-]/g, ""); }
 function pageText(q) { return q && q.page ? `교과서 ${q.page}쪽` : ""; }
 function renderJoinCodeGate() {
   let submitting = false;
@@ -985,6 +995,16 @@ function renderStudentPage(ownerId) {
             <label class="label">${isMultiple ? "정답 설명 (선택)" : "모범 답안"}</label>
             <textarea class="input" id="a-input" rows="2" placeholder="${isMultiple ? "비워 두면 고른 정답 보기가 자동으로 들어가요" : "모범 답안을 입력하세요"}" style="resize:vertical;">${esc(draft.answer)}</textarea>
           </div>
+          ${isMultiple ? "" : `
+          <div>
+            <label class="label">정답으로 인정할 답</label>
+            <p style="font-size:13px;color:var(--ink-soft);margin:-2px 0 8px;line-height:1.5;">모범 답안과 뜻이 같은 다른 표현을 한 줄에 하나씩 적어요. 예) 세종, 세종 대왕, 이도</p>
+            <textarea class="input" id="acc-input" rows="3" placeholder="한 줄에 하나씩" ${draft.noAccepted ? "disabled" : ""} style="resize:vertical;${draft.noAccepted ? "opacity:.45;" : ""}">${esc(draft.accepted)}</textarea>
+            <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;color:var(--ink-soft);cursor:pointer;">
+              <input type="checkbox" id="no-acc-check" ${draft.noAccepted ? "checked" : ""} style="accent-color:var(--board);width:16px;height:16px;">
+              모범 답안만 정답이에요 (다른 답은 인정하지 않아요)
+            </label>
+          </div>`}
         </div>
 
         ${error ? `<p class="error-box fade-in">${esc(error)}</p>` : ""}
@@ -1056,6 +1076,13 @@ function renderStudentPage(ownerId) {
       };
       document.getElementById("q-input").oninput = (e) => { draft.question = e.target.value; saveJSON(draftKey, draft); };
       document.getElementById("a-input").oninput = (e) => { draft.answer = e.target.value; saveJSON(draftKey, draft); };
+      const accInput = document.getElementById("acc-input");
+      if (accInput) accInput.oninput = (e) => { draft.accepted = e.target.value; saveJSON(draftKey, draft); };
+      const noAcc = document.getElementById("no-acc-check");
+      if (noAcc) noAcc.onchange = (e) => {
+        draft.noAccepted = e.target.checked; saveJSON(draftKey, draft);
+        accInput.disabled = draft.noAccepted; accInput.style.opacity = draft.noAccepted ? ".45" : "1";
+      };
       document.querySelectorAll(".choice-input").forEach((inp) => inp.oninput = (e) => {
         draft.choices[Number(inp.dataset.idx)] = e.target.value; saveJSON(draftKey, draft);
       });
@@ -1107,6 +1134,11 @@ function renderStudentPage(ownerId) {
     const isMultiple = draft.type === QUESTION_TYPES.MULTIPLE;
     const choices = isMultiple ? draft.choices.map((c) => c.trim()) : [];
     const answer = draft.answer.trim() || (isMultiple ? choices[Number(draft.correctChoice) - 1] : "");
+    const acceptedAnswers = isMultiple || draft.noAccepted ? [] : parseAccepted(draft.accepted).filter((x) => normAnswer(x) !== normAnswer(answer));
+    if (!isMultiple && !draft.noAccepted && acceptedAnswers.length === 0) {
+      error = "정답으로 인정할 다른 답을 적거나, '모범 답안만 정답이에요'에 체크해 주세요."; paintStep(); return;
+    }
+    if (acceptedAnswers.some((x) => containsBadWord(x))) { error = "인정할 답에 부적절한 단어가 있어요."; paintStep(); return; }
 
     submitting = true; error = ""; paintStep();
     try {
@@ -1123,7 +1155,7 @@ function renderStudentPage(ownerId) {
       batch.set(doc(collection(db, COLLECTIONS.QUESTIONS)), {
         ownerId, countKey,
         class: studentInfo.studentClass, number: String(Number(studentInfo.number)), name: studentInfo.name.trim(),
-        subject: draft.subject, gradeTerm: GRADE_TERM, unit, page, type: draft.type, question: draft.question.trim(), answer,
+        subject: draft.subject, gradeTerm: GRADE_TERM, unit, page, type: draft.type, question: draft.question.trim(), answer, acceptedAnswers,
         choices,
         correctChoice: draft.type === QUESTION_TYPES.MULTIPLE ? draft.correctChoice : "",
         createdAt: serverTimestamp(), isApproved: false, isDeleted: false,
@@ -1167,7 +1199,7 @@ function isPracticeQuestion(q, scope = "both") {
 function toPracticeItem(q) {
   return {
     id: q.id, subject: q.subject || "", unit: q.unit || "", page: q.page || "", type: q.type,
-    question: q.question || "", answer: q.answer || "", choices: q.choices || [], correctChoice: q.correctChoice || "",
+    question: q.question || "", answer: q.answer || "", acceptedAnswers: acceptedList(q), choices: q.choices || [], correctChoice: q.correctChoice || "",
   };
 }
 function hashString(str) { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return String(h >>> 0); }
@@ -1178,7 +1210,7 @@ function renderPracticePage(ownerId) {
   let loadError = "";
   let phase = "setup";      // setup | play | result
   const opt = { subject: "", unit: "", count: 10 };
-  let set = [], idx = 0, picked = null, revealed = false, results = [];
+  let set = [], idx = 0, picked = null, revealed = false, results = [], myEssay = "";
 
   app.innerHTML = `<div class="center-screen"><div class="spinner spin"></div></div>`;
 
@@ -1279,7 +1311,7 @@ function renderPracticePage(ownerId) {
   function startSet(list) {
     set = opt.count ? list.slice(0, opt.count) : list;
     if (set.length === 0) return;
-    idx = 0; picked = null; revealed = false; results = [];
+    idx = 0; picked = null; revealed = false; results = []; myEssay = "";
     phase = "play"; paint(); window.scrollTo(0, 0);
   }
 
@@ -1315,9 +1347,11 @@ function renderPracticePage(ownerId) {
           ${!revealed ? `
             <textarea class="input" id="p-essay" rows="3" placeholder="내 답을 먼저 써 보세요 (선택)" style="resize:vertical;"></textarea>
             <button class="btn btn-dark" id="p-reveal" style="width:100%;">정답 확인하기</button>` : `
-            <div style="background:var(--gold-soft);border-radius:14px;padding:14px 16px;">
+            ${myEssay ? `<p style="margin:0;font-size:14px;color:var(--ink-soft);">내 답: <b style="color:var(--ink);">${esc(myEssay)}</b></p>` : ""}
+            <div style="background:var(--gold-soft);border-radius:10px;padding:14px 16px;">
               <p style="font-size:12px;font-weight:800;color:var(--gold-deep);margin:0 0 4px;">모범 답안</p>
               <p style="font-size:16px;font-weight:700;white-space:pre-wrap;margin:0;">${esc(q.answer)}</p>
+              ${acceptedList(q).length ? `<p style="font-size:14px;margin:8px 0 0;color:var(--ink);"><span style="color:var(--gold-deep);font-weight:800;">이것도 정답</span> ${acceptedList(q).map(esc).join(", ")}</p>` : ""}
             </div>
             ${results[idx] === undefined ? `
             <p style="font-size:13px;color:var(--ink-soft);text-align:center;margin:0;">내 답과 비교해 보고 스스로 채점해요.</p>
@@ -1338,7 +1372,13 @@ function renderPracticePage(ownerId) {
       picked = b.dataset.n; results[idx] = picked === correct; paintPlay();
     });
     const rv = document.getElementById("p-reveal");
-    if (rv) rv.onclick = () => { revealed = true; paintPlay(); };
+    if (rv) rv.onclick = () => {
+      myEssay = (document.getElementById("p-essay")?.value || "").trim();
+      revealed = true;
+      // 쓴 답이 모범 답안이나 인정 답과 같으면 바로 정답 처리 (아니면 스스로 채점)
+      if (myEssay && [q.answer, ...acceptedList(q)].some((a) => normAnswer(a) && normAnswer(a) === normAnswer(myEssay))) results[idx] = true;
+      paintPlay();
+    };
     const so = document.getElementById("p-self-o");
     if (so) so.onclick = () => { results[idx] = true; paintPlay(); };
     const sx = document.getElementById("p-self-x");
@@ -1346,7 +1386,7 @@ function renderPracticePage(ownerId) {
     const nx = document.getElementById("p-next");
     if (nx) nx.onclick = () => {
       if (idx === set.length - 1) { phase = "result"; paint(); window.scrollTo(0, 0); return; }
-      idx += 1; picked = null; revealed = false; paintPlay(); window.scrollTo(0, 0);
+      idx += 1; picked = null; revealed = false; myEssay = ""; paintPlay(); window.scrollTo(0, 0);
     };
   }
 
@@ -1366,7 +1406,7 @@ function renderPracticePage(ownerId) {
             ${wrong.map((q) => `
               <div style="font-size:13px;line-height:1.5;">
                 <div style="font-weight:700;color:var(--ink);white-space:pre-wrap;">${esc(q.question)}</div>
-                <div style="color:var(--green);font-weight:700;">정답: ${q.type === QUESTION_TYPES.MULTIPLE ? `${esc(q.correctChoice)}번 ${esc((q.choices || [])[Number(q.correctChoice) - 1] || "")}` : esc(q.answer)}</div>
+                <div style="color:var(--green);font-weight:700;">정답: ${q.type === QUESTION_TYPES.MULTIPLE ? `${esc(q.correctChoice)}번 ${esc((q.choices || [])[Number(q.correctChoice) - 1] || "")}` : esc([q.answer, ...acceptedList(q)].join(", "))}</div>
                 ${q.page ? `<div style="color:var(--ink-soft);">${esc(pageText(q))}</div>` : ""}
               </div>`).join("")}
           </div>
@@ -2526,7 +2566,7 @@ function renderAdminDashboard(ownerId) {
                 <td style="white-space:nowrap;color:${q.page ? "var(--ink)" : "var(--ink-soft)"};">${q.page ? `${esc(q.page)}쪽` : "-"}</td>
                 <td>${esc(q.type)}</td>
                 <td class="truncate q-row-click" data-open="${q.id}" title="눌러서 자세히 보기·수정">${esc(q.question)}</td>
-                <td class="truncate" style="max-width:140px;" title="${esc(q.answer)}">${esc(q.answer)}</td>
+                <td class="truncate" style="max-width:160px;" title="${esc([q.answer, ...acceptedList(q)].join(", "))}">${esc(q.answer)}${acceptedList(q).length ? ` <span style="font-size:12px;color:var(--ink-soft);">외 ${acceptedList(q).length}개</span>` : ""}</td>
                 <td style="color:var(--ink-soft);font-size:12px;white-space:nowrap;">${createdAt}</td>
                 <td><span class="badge ${q.isApproved ? "approved" : "pending"}" ${!q.isApproved && q.isImported ? `style="background:#E3EAF3;color:#3A5A86;"` : ""}>${q.isApproved ? "승인" : q.isImported ? "연습용" : "미승인"}</span>${q.isImported ? `<div style="font-size:11px;color:var(--ink-soft);margin-top:3px;white-space:nowrap;">가져옴</div>` : ""}</td>
                 <td>
@@ -2572,7 +2612,7 @@ function renderAdminDashboard(ownerId) {
     if (!q) return;
     const ed = {
       subject: q.subject || "", unit: q.unit || "", page: q.page || "", type: q.type || QUESTION_TYPES.MULTIPLE,
-      question: q.question || "", answer: q.answer || "",
+      question: q.question || "", answer: q.answer || "", accepted: acceptedList(q).join("\n"),
       choices: Array.isArray(q.choices) && q.choices.length === CHOICE_COUNT ? [...q.choices] : ["", "", "", ""],
       correctChoice: q.correctChoice || "",
     };
@@ -2614,6 +2654,8 @@ function renderAdminDashboard(ownerId) {
             </div></div>` : ""}
           <div><label class="label" style="font-size:12px;">${isMultiple ? "정답 설명 (선택)" : "모범 답안"}</label>
             <textarea class="input" id="m-answer" rows="2" style="resize:vertical;">${esc(ed.answer)}</textarea></div>
+          ${isMultiple ? "" : `<div><label class="label" style="font-size:12px;">정답으로 인정할 답 (한 줄에 하나)</label>
+            <textarea class="input" id="m-accepted" rows="3" style="resize:vertical;">${esc(ed.accepted)}</textarea></div>`}
           ${errMsg ? `<p class="error-box">${esc(errMsg)}</p>` : ""}
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;">
             <button class="btn btn-gold" id="m-save" style="flex:2;min-width:140px;">수정 내용 저장</button>
@@ -2629,6 +2671,7 @@ function renderAdminDashboard(ownerId) {
         ed.page = body.querySelector("#m-page").value;
         ed.question = body.querySelector("#m-question").value;
         ed.answer = body.querySelector("#m-answer").value;
+        const accEl = body.querySelector("#m-accepted"); if (accEl) ed.accepted = accEl.value;
         body.querySelectorAll(".m-choice").forEach((inp) => { ed.choices[Number(inp.dataset.i)] = inp.value; });
       };
       body.querySelector("#m-subject").onchange = () => { keep(); if (!unitsFor(ed.subject, gt).includes(ed.unit)) ed.unit = ""; paintModal(); };
@@ -2645,6 +2688,7 @@ function renderAdminDashboard(ownerId) {
         const update = {
           subject: ed.subject, unit: ed.unit, page, type: ed.type, question: ed.question.trim(),
           answer: ed.answer.trim() || (isMul ? choices[Number(ed.correctChoice) - 1] : ""),
+          acceptedAnswers: isMul ? [] : parseAccepted(ed.accepted).filter((x) => normAnswer(x) !== normAnswer(ed.answer)),
           choices, correctChoice: isMul ? ed.correctChoice : "", editedAt: serverTimestamp(),
         };
         try { await updateDoc(doc(db, COLLECTIONS.QUESTIONS, id), update); closeModal(); showNotice("문제를 수정했습니다."); }
@@ -3100,7 +3144,8 @@ function renderGoldenBellPage() {
                <p class="gb-answer-label">정답</p>
                ${isMultiple
                  ? `<p class="gb-answer-text">${esc(q.correctChoice)}번 &nbsp; <span style="font-size:.7em;font-weight:700;margin-left:.3em;">${esc((q.choices || [])[Number(q.correctChoice) - 1] || "")}</span></p>`
-                 : `<p class="gb-answer-text">${esc(q.answer)}</p>`}
+                 : `<p class="gb-answer-text">${esc(q.answer)}</p>
+                    ${acceptedList(q).length ? `<p class="gb-accepted"><b>이것도 정답</b> ${acceptedList(q).map(esc).join(", ")}</p>` : ""}`}
                ${q.page ? `<p style="margin:.4em 0 0;font-size:.8em;font-weight:700;opacity:.8;">${esc(pageText(q))}</p>` : ""}
              </div>`}
         <div class="gb-author">${authorLine ? `출제자: <b>${esc(authorLine)}</b>` : "출제자는 정답 공개 후 표시됩니다"}</div>
