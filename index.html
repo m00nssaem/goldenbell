@@ -15,27 +15,30 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" defer></script>
 <style>
   :root{
-    --gold:#E8B923;
-    --gold-deep:#B8860B;
-    --gold-soft:#FBE7A1;
-    --navy:#13151F;
-    --navy-soft:#1C2032;
-    --navy-line:rgba(255,255,255,.1);
-    --cream:#FAF6EC;
+    /* 교실에서 가져온 색: 칠판, 분필, 교실 벽, 종(놋쇠), 빨간 색연필 */
+    --board:#1F3A32;        /* 칠판 */
+    --board-ink:#F4F3EC;    /* 분필 */
+    --gold:#D9A520;         /* 종 (주요 버튼에만) */
+    --gold-deep:#7E5C0E;
+    --gold-soft:#F5E7BC;
+    --cream:#E8ECE5;        /* 교실 벽 (배경) */
     --card:#FFFFFF;
-    --ink:#22242C;
-    --ink-soft:#6B6E7A;
-    --line:#E9E2CF;
-    --green:#1F9D55;
-    --green-soft:#E7F7ED;
-    --red:#DD4B3E;
-    --red-soft:#FDECEA;
-    --amber:#F0A93D;
-    --radius:20px;
-    --radius-sm:13px;
+    --ink:#1C2420;
+    --ink-soft:#5F6964;
+    --line:#D2D9D0;
+    --green:#2D7A4E;
+    --green-soft:#E1EFE5;
+    --red:#C23B2B;          /* 빨간 색연필 */
+    --red-soft:#F7E2DE;
+    --amber:#E39A2B;
+    --navy:#1F3A32;
+    --navy-soft:#26463C;
+    --navy-line:rgba(244,243,236,.12);
+    --radius:12px;
+    --radius-sm:8px;
     --font-body:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
     --font-display:'Black Han Sans','Pretendard',sans-serif;
-    --shadow:0 2px 14px rgba(34,30,10,.06);
+    --shadow:none;
     --footer-h:44px;
   }
   *{box-sizing:border-box;}
@@ -47,14 +50,17 @@
     min-height:100vh;
   }
   body.page-student, body.page-admin{ background:var(--cream); }
-  body.page-goldenbell{ background:var(--navy); color:#fff; overflow-x:hidden; }
-  #app{ min-height:calc(100vh - var(--footer-h)); }
+  body.page-goldenbell{ background:var(--gb-bg); color:var(--gb-fg); overflow-x:hidden; transition:background .3s, color .3s;
+    /* 골든벨 화면의 모든 크기는 이 글자 크기(em) 기준 → 전자칠판처럼 큰 화면일수록 같이 커짐 */
+    font-size:clamp(15px, 0.95vw + 0.6vh, 40px); }
+  #app{ min-height:calc((100vh - var(--footer-h)) / var(--z, 1)); }
   button, input, select, textarea{ font-family:inherit; font-size:inherit; }
   button{ cursor:pointer; border:none; }
   a{ color:inherit; text-decoration:none; }
 
   /* ---------- shared ---------- */
-  .fade-in{ animation:fadeIn .35s ease-out; }
+  .fade-in{ }
+  @media (prefers-reduced-motion: reduce){ *{ animation:none !important; transition:none !important; } }
   @keyframes fadeIn{ from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
   .pop{ animation:pop .4s ease-out; }
   @keyframes pop{ 0%{transform:scale(.85);opacity:0;} 60%{transform:scale(1.04);opacity:1;} 100%{transform:scale(1);} }
@@ -63,122 +69,215 @@
   .spin{ animation:spin .8s linear infinite; }
   @keyframes spin{ to{ transform:rotate(360deg); } }
 
-  .card{ background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:22px; }
-  .btn{ border-radius:14px; font-weight:700; padding:14px 18px; transition:filter .15s, transform .1s; }
-  .btn:active{ transform:scale(.98); }
-  .btn-gold{ background:var(--gold); color:#3a2c02; }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:22px; }
+  .btn{ border-radius:var(--radius-sm); font-weight:700; padding:13px 18px; transition:background-color .15s, filter .15s; }
+  .btn:active{ filter:brightness(.95); }
+  .btn-gold{ background:var(--gold); color:#2A2208; }
   .btn-gold:hover{ filter:brightness(1.05); }
-  .btn-dark{ background:var(--ink); color:#fff; }
-  .btn-ghost{ background:#F1EDE0; color:var(--ink); }
+  .btn-dark{ background:var(--board); color:var(--board-ink); }
+  .btn-ghost{ background:#E3E9E1; color:var(--ink); }
   .btn-red{ background:var(--red-soft); color:var(--red); }
   .btn-red-solid{ background:var(--red); color:#fff; }
   .btn-green{ background:var(--green); color:#fff; }
   .btn:disabled{ opacity:.5; cursor:not-allowed; }
-  .pill-btn{ padding:11px 6px; border-radius:13px; font-weight:600; font-size:14px; border:2px solid var(--line); background:#fff; color:var(--ink-soft); text-align:center; }
-  .pill-btn.active{ background:var(--gold); border-color:var(--gold); color:#3a2c02; }
-  .input{ width:100%; padding:14px; border-radius:13px; border:2px solid var(--line); outline:none; background:#fff; color:var(--ink); }
-  .input:focus{ border-color:var(--gold); }
+  .pill-btn{ padding:11px 6px; border-radius:var(--radius-sm); font-weight:600; font-size:14px; border:1px solid var(--line); background:#fff; color:var(--ink); text-align:center; }
+  .pill-btn.active{ background:var(--board); border-color:var(--board); color:var(--board-ink); }
+  .input{ width:100%; padding:13px 14px; border-radius:var(--radius-sm); border:1px solid #C3CCC1; outline:none; background:#fff; color:var(--ink); }
+  .input:focus{ border-color:var(--board); box-shadow:0 0 0 3px rgba(31,58,50,.12); }
   .label{ display:block; font-weight:700; font-size:15px; margin-bottom:8px; color:var(--ink); }
-  .error-box{ font-size:14px; font-weight:600; color:var(--red); background:var(--red-soft); border:1px solid #F5C9C4; border-radius:13px; padding:12px 14px; }
+  .error-box{ font-size:14px; font-weight:600; color:var(--red); background:var(--red-soft); border-left:3px solid var(--red); border-radius:4px; padding:11px 14px; }
   .grid3{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
   .grid4{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
   /* 팝업 창 */
   .modal-back{ position:fixed; inset:0; z-index:90; background:rgba(20,18,10,.45); display:flex; align-items:flex-start; justify-content:center; padding:40px 14px; overflow-y:auto; }
-  .modal-box{ background:#fff; color:var(--ink); border-radius:var(--radius); width:100%; max-width:560px; padding:22px; box-shadow:0 20px 50px rgba(0,0,0,.25); }
+  .modal-box{ background:#fff; color:var(--ink); border-radius:var(--radius); width:100%; max-width:560px; padding:22px; box-shadow:0 18px 40px rgba(0,0,0,.22); animation:pop .2s ease-out; }
   .modal-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
   .modal-head h3{ margin:0; font-size:17px; font-weight:800; }
   .modal-x{ background:none; font-size:20px; color:var(--ink-soft); padding:4px 8px; }
   .q-row-click{ cursor:pointer; }
   .q-row-click:hover{ text-decoration:underline; }
+  /* 큰 화면(전자칠판·큰 모니터)에서는 관리자·학생 화면 전체를 비율대로 키움 */
+  :root{ --z:1; }
+  @media (min-width:1500px){ :root{ --z:1.12; } }
+  @media (min-width:1900px){ :root{ --z:1.25; } }
+  @media (min-width:2500px){ :root{ --z:1.6; } }
+  @media (min-width:3400px){ :root{ --z:2.1; } }
+  body.page-goldenbell{ --z:1; }
+  body:not(.page-goldenbell) #app, .modal-back{ zoom:var(--z); }
+  .modal-back{ width:calc(100vw / var(--z)); height:calc(100vh / var(--z)); inset:0 auto auto 0; }
   /* 모든 화면 맨 아래 제작자 표시 */
   .site-footer{ height:var(--footer-h); display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--ink-soft); opacity:.6; letter-spacing:.02em; }
-  body.page-goldenbell .site-footer{ color:rgba(255,255,255,.55); }
+  body.page-goldenbell .site-footer{ color:var(--gb-faint); opacity:1; }
   @media print{ .site-footer{ display:none; } }
 
   /* ---------- student page ---------- */
-  .student-wrap{ max-width:460px; margin:0 auto; padding:32px 16px 40px; }
-  .brand{ text-align:center; margin-bottom:4px; font-family:var(--font-display); font-size:24px; letter-spacing:.01em; }
+  .student-wrap{ max-width:600px; margin:0 auto; padding:32px 16px 40px; }
+  .brand{ text-align:center; margin-bottom:4px; font-family:var(--font-display); font-size:30px; letter-spacing:.01em; color:var(--board); }
+  .bell{ width:1em; height:1em; vertical-align:-0.13em; margin-right:.28em; color:var(--gold); }
+  .gate-bell{ text-align:center; font-size:46px; line-height:1; margin-bottom:10px; }
+  .gate-bell .bell{ margin:0; }
   .brand-sub{ text-align:center; font-size:13px; color:var(--ink-soft); margin-bottom:22px; }
   .dots{ display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:20px; }
-  .dot{ height:8px; border-radius:99px; background:var(--line); transition:all .25s; }
-  .dot.current{ width:30px; background:var(--gold); }
-  .dot.done{ width:8px; background:var(--gold-deep); }
-  .choice-idx{ width:28px; height:28px; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:99px; background:#F1EDE0; font-size:13px; font-weight:700; color:var(--ink-soft); }
-  .spinner{ width:32px; height:32px; border:4px solid var(--gold-soft); border-top-color:var(--gold); border-radius:99px; margin:0 auto; }
-  .center-screen{ min-height:calc(100vh - var(--footer-h)); display:flex; align-items:center; justify-content:center; padding:24px; }
+  .dot{ width:8px; height:8px; border-radius:99px; background:#B8C2B6; transition:all .25s; }
+  .dot.current{ width:30px; background:var(--board); }
+  .dot.done{ width:8px; background:var(--green); }
+  .choice-idx{ width:28px; height:28px; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:99px; background:#E3E9E1; font-size:13px; font-weight:700; color:var(--ink-soft); }
+  .spinner{ width:32px; height:32px; border:3px solid var(--line); border-top-color:var(--board); border-radius:99px; margin:0 auto; }
+  .who-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+  .who-chip{ font-size:14px; font-weight:800; }
+  .count-chip{ font-size:12px; font-weight:700; border-radius:99px; padding:5px 11px; background:#E3E9E1; color:var(--ink-soft); }
+  .count-chip.on{ background:var(--gold-soft); color:var(--gold-deep); }
+  .q-section{ border-top:1px solid var(--line); padding-top:16px; display:flex; flex-direction:column; gap:14px; }
+  .q-section-title{ margin:0; font-weight:800; font-size:15px; display:flex; align-items:center; gap:8px; }
+  .q-step{ width:24px; height:24px; border-radius:99px; background:var(--board); color:var(--board-ink); font-size:12px; display:inline-flex; align-items:center; justify-content:center; }
+  .seg{ display:grid; grid-template-columns:1fr 1fr; gap:4px; background:#E3E9E1; border-radius:10px; padding:4px; }
+  .seg-btn{ display:flex; align-items:center; justify-content:center; gap:6px; padding:10px; border-radius:7px; font-weight:700; font-size:14px; color:var(--ink-soft); cursor:pointer; }
+  .seg-btn input{ position:absolute; opacity:0; pointer-events:none; }
+  .seg-btn.active{ background:#fff; color:var(--ink); box-shadow:0 1px 4px rgba(0,0,0,.08); }
+  .choice-row{ display:flex; align-items:center; gap:8px; }
+  .choice-mark{ width:38px; height:38px; flex-shrink:0; border-radius:99px; border:1px solid #C3CCC1; background:#fff; color:var(--ink-soft); font-weight:800; font-size:14px; }
+  .choice-mark.active{ background:var(--green); border-color:var(--green); color:#fff; }
+  .choice-mark.active::after{ content:"✓"; font-size:12px; margin-left:1px; }
+  .choice-row:has(.choice-mark.active) .choice-input{ border-color:var(--green); background:var(--green-soft); }
+  .pen-mark{ margin-left:auto; color:var(--red); font-size:34px; font-weight:400; line-height:1; font-family:'Times New Roman',serif; }
+  .score-big{ font-family:var(--font-display); font-size:64px; line-height:1; color:var(--red); }
+  .score-big small{ font-size:28px; color:var(--ink-soft); }
+  .p-tag{ font-size:12px; font-weight:700; background:#E3E9E1; color:var(--board); border-radius:6px; padding:5px 11px; max-width:70%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .p-question{ font-size:20px; font-weight:800; line-height:1.55; white-space:pre-wrap; margin:4px 0; word-break:keep-all; }
+  .p-choice{ display:flex; align-items:center; gap:12px; text-align:left; width:100%; padding:14px 16px; border-radius:var(--radius-sm); border:1px solid #C3CCC1; background:#fff; color:var(--ink); font-size:16px; font-weight:700; transition:border-color .15s, transform .1s; }
+  .p-choice:hover:not(:disabled){ border-color:var(--board); }
+  .p-choice:active:not(:disabled){ transform:scale(.99); }
+  .p-choice:disabled{ cursor:default; }
+  .center-screen{ min-height:calc((100vh - var(--footer-h)) / var(--z, 1)); display:flex; align-items:center; justify-content:center; padding:24px; }
 
   /* ---------- admin page ---------- */
-  .admin-wrap{ max-width:1100px; margin:0 auto; padding:22px 16px 60px; }
+  .admin-wrap{ max-width:1680px; margin:0 auto; padding:22px clamp(16px, 3vw, 48px) 60px; }
   .admin-head{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:16px; }
-  .admin-title{ font-family:var(--font-display); font-size:22px; display:flex; align-items:center; gap:8px; }
+  .admin-title{ font-family:var(--font-display); font-size:24px; display:flex; align-items:center; color:var(--board); }
   .live-dot{ display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--green); font-weight:700; }
   .live-dot span.d{ width:8px; height:8px; border-radius:99px; background:var(--green); animation:pulse 1.6s infinite; }
   @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
   .notice{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%); z-index:100; max-width:calc(100% - 32px); background:var(--ink); color:#fff; font-size:14px; font-weight:600; border-radius:13px; padding:12px 18px; box-shadow:0 8px 24px rgba(0,0,0,.25); display:none; }
   .stat-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
   @media(min-width:700px){ .stat-grid{ grid-template-columns:repeat(4,1fr);} }
-  .stat-card{ background:#fff; border-radius:16px; box-shadow:var(--shadow); padding:14px 16px; }
+  .stat-card{ background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; }
   .stat-label{ font-size:12px; color:var(--ink-soft); }
-  .stat-value{ font-size:24px; font-weight:800; margin-top:2px; }
+  .stat-value{ font-size:28px; font-weight:800; margin-top:2px; font-variant-numeric:tabular-nums; }
   .two-col{ display:grid; grid-template-columns:1fr; gap:14px; margin-top:14px; }
   @media(min-width:850px){ .two-col{ grid-template-columns:2fr 1fr; } }
   .bar-row{ display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:7px; }
   .bar-label{ width:44px; flex-shrink:0; color:var(--ink-soft); }
-  .bar-track{ flex:1; height:10px; border-radius:99px; background:#EFEAD9; overflow:hidden; }
-  .bar-fill{ height:100%; border-radius:99px; background:var(--gold); transition:width .4s; }
+  .bar-track{ flex:1; height:10px; border-radius:99px; background:#E0E6DE; overflow:hidden; }
+  .bar-fill{ height:100%; border-radius:99px; background:var(--board); transition:width .4s; }
   .bar-val{ width:24px; text-align:right; font-weight:700; color:var(--ink-soft); }
-  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  table{ width:100%; border-collapse:collapse; font-size:14px; }
   th{ text-align:left; padding:11px 10px; color:var(--ink-soft); font-weight:700; border-bottom:1px solid var(--line); white-space:nowrap; }
-  td{ padding:11px 10px; border-bottom:1px solid #F3EFE2; vertical-align:top; }
-  tr:hover td{ background:#FCFAF3; }
-  .truncate{ max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .badge{ padding:3px 10px; border-radius:99px; font-size:11px; font-weight:700; }
+  td{ padding:11px 10px; border-bottom:1px solid #E6EBE4; vertical-align:top; }
+  tr:hover td{ background:#F4F7F3; }
+  .truncate{ max-width:clamp(220px, 22vw, 520px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .badge{ padding:3px 10px; border-radius:99px; font-size:12px; font-weight:700; }
   .badge.approved{ background:var(--green-soft); color:var(--green); }
-  .badge.pending{ background:#FEF3DC; color:#946A08; }
-  .table-wrap{ background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); overflow-x:auto; }
-  .empty-box{ background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:44px 20px; text-align:center; color:var(--ink-soft); }
+  .badge.pending{ background:#F5E7BC; color:#7E5C0E; }
+  .table-wrap{ background:#fff; border:1px solid var(--line); border-radius:var(--radius); overflow-x:auto; }
+  .empty-box{ background:#fff; border:1px dashed #BAC4B8; border-radius:var(--radius); padding:44px 20px; text-align:center; color:var(--ink-soft); }
   .btn-group{ display:flex; gap:8px; flex-wrap:wrap; }
   .qr-box canvas, .qr-box img{ display:block; }
+  .head-actions{ display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+  .user-chip{ font-size:13px; font-weight:700; color:var(--ink); padding:7px 4px; margin-right:6px; }
+  .head-link{ background:none; color:var(--ink-soft); font-size:13px; font-weight:600; padding:8px 8px; border-radius:10px; }
+  .head-link:hover{ background:#E3E9E1; color:var(--ink); }
+  .tab-bar{ display:flex; gap:0; background:var(--cream); border-bottom:2px solid var(--line); margin:18px 0 16px; overflow-x:auto; position:sticky; top:0; z-index:20; }
+  .tab-btn{ min-width:max-content; padding:12px 18px; margin-bottom:-2px; border-bottom:3px solid transparent; background:none; font-weight:700; color:var(--ink-soft); font-size:15px; white-space:nowrap; display:flex; align-items:center; gap:6px; }
+  .tab-btn:hover{ color:var(--ink); }
+  .tab-btn.active{ color:var(--board); border-bottom-color:var(--board); background:#fff; border-radius:8px 8px 0 0; }
+  .tab-count{ background:var(--red); color:#fff; border-radius:99px; padding:1px 7px; font-size:12px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .tab-panel{ display:none; }
+  .tab-panel.active{ display:block; }
+  .panel-grid{ display:grid; grid-template-columns:1fr; gap:14px; align-items:start; }
+  @media(min-width:860px){ .panel-grid{ grid-template-columns:1fr 1fr; } }
+  .charts-card{ padding:14px 18px; }
+  .charts-card summary{ cursor:pointer; font-weight:700; font-size:14px; list-style:none; display:flex; align-items:center; justify-content:space-between; }
+  .charts-card summary::after{ content:"펼치기 ▾"; font-size:12px; color:var(--ink-soft); font-weight:600; }
+  .charts-card[open] summary::after{ content:"접기 ▴"; }
+  .charts-card summary::-webkit-details-marker{ display:none; }
 
   /* ---------- goldenbell (quiz) page ---------- */
-  .gb-topbar{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 18px; border-bottom:1px solid var(--navy-line); position:relative; flex-wrap:wrap; }
-  .gb-progress{ display:flex; align-items:center; gap:10px; min-width:150px; }
-  .gb-progress-track{ flex:1; height:8px; background:rgba(255,255,255,.12); border-radius:99px; overflow:hidden; }
+  .gb-topbar{ display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:.6em; padding:.55em 1em; border-bottom:1px solid var(--gb-line); position:relative; }
+  .gb-progress{ display:flex; align-items:center; gap:.6em; min-width:0; max-width:14em; }
+  .gb-count{ font-weight:800; font-size:1.4em; white-space:nowrap; }
+  .gb-count small{ font-size:.6em; color:var(--gb-muted); font-weight:600; }
+  .gb-top-right{ display:flex; align-items:center; justify-content:flex-end; gap:.45em; }
+  @media(max-width:700px){ .gb-topbar{ grid-template-columns:1fr auto; } .gb-subject-chip{ grid-column:1 / -1; grid-row:2; justify-self:center; } }
+  .gb-progress-track{ flex:1; height:.35em; background:var(--gb-line); border-radius:99px; overflow:hidden; }
   .gb-progress-fill{ height:100%; background:var(--gold); border-radius:99px; transition:width .5s; }
-  .gb-subject-chip{ padding:7px 16px; border-radius:99px; background:rgba(255,255,255,.1); font-weight:700; }
-  .gb-icon-btn{ width:42px; height:42px; border-radius:99px; background:rgba(255,255,255,.1); color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; }
-  .gb-icon-btn:hover{ background:rgba(255,255,255,.18); }
-  .gb-survivors{ display:flex; align-items:center; gap:6px; padding:4px 8px; border-radius:16px; background:rgba(255,255,255,.06); }
-  .timer-wrap{ position:relative; width:74px; height:74px; flex-shrink:0; }
-  .timer-svg{ width:74px; height:74px; transform:rotate(-90deg); }
-  .timer-value{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:20px; }
+  .gb-subject-chip{ padding:.4em 1em; border-radius:99px; background:var(--gb-surface2); font-weight:700; font-size:1em; max-width:50vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .gb-icon-btn{ width:1.9em; height:1.9em; border-radius:99px; background:var(--gb-surface2); color:var(--gb-fg); display:flex; align-items:center; justify-content:center; font-size:18px; }
+  .gb-icon-btn:hover{ background:var(--gb-line); }
+  .gb-survivors{ display:inline-flex; align-items:center; gap:.35em; padding:.3em .5em; border-radius:.8em; background:var(--gb-surface); }
+  .timer-wrap{ position:relative; width:3.4em; height:3.4em; flex-shrink:0; }
+  .timer-svg{ width:100%; height:100%; transform:rotate(-90deg); }
+  .timer-value{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.15em; }
   .timer-value.urgent{ color:var(--amber); }
-  .timer-none{ display:flex; align-items:center; gap:6px; color:rgba(255,255,255,.6); font-weight:600; font-size:14px; }
-  .gb-settings-panel{ position:absolute; top:60px; right:16px; z-index:30; width:290px; background:#232738; border:1px solid var(--navy-line); border-radius:18px; box-shadow:0 10px 30px rgba(0,0,0,.4); padding:16px; }
-  .gb-body{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:36px 20px; text-align:center; min-height:52vh; }
-  .gb-qnum{ color:var(--gold); font-weight:800; font-size:18px; margin-bottom:10px; letter-spacing:.02em; }
-  .gb-question{ font-family:var(--font-display); font-size:clamp(22px,4vw,40px); max-width:900px; line-height:1.5; margin-bottom:26px; white-space:pre-wrap; }
-  .gb-choices{ display:grid; grid-template-columns:1fr; gap:11px; width:100%; max-width:700px; margin-bottom:22px; }
+  .timer-none{ display:flex; align-items:center; gap:.3em; color:var(--gb-muted); font-weight:600; font-size:.8em; }
+  .gb-settings-panel{ position:absolute; top:100%; right:1em; z-index:30; width:320px; font-size:15px; background:var(--gb-panel); border:1px solid var(--gb-line); border-radius:18px; box-shadow:0 10px 30px rgba(0,0,0,.4); padding:16px; }
+  .gb-body{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2.5vh 3vw; text-align:center; min-height:52vh; }
+  .gb-qnum{ color:var(--gold); font-weight:800; font-size:1.05em; margin-bottom:.4em; letter-spacing:.02em; }
+  .gb-question{ font-family:var(--font-display); font-size:clamp(28px, 2.9vw + 1.8vh, 130px); max-width:94vw; line-height:1.38; margin-bottom:.55em; white-space:pre-wrap; word-break:keep-all; }
+  .gb-choices{ display:grid; grid-template-columns:1fr; gap:.6em; width:100%; max-width:min(94vw, 2200px); margin-bottom:1.1em; }
   @media(min-width:640px){ .gb-choices{ grid-template-columns:1fr 1fr; } }
-  .gb-choice{ padding:16px 18px; border-radius:15px; font-size:18px; font-weight:700; border:2px solid rgba(255,255,255,.12); background:rgba(255,255,255,.05); display:flex; align-items:center; gap:12px; text-align:left; }
-  .gb-choice.correct{ background:var(--gold); border-color:var(--gold-soft); color:#3a2c02; }
-  .gb-choice-idx{ width:30px; height:30px; flex-shrink:0; border-radius:99px; background:rgba(255,255,255,.15); display:flex; align-items:center; justify-content:center; font-size:14px; }
+  .gb-choice{ padding:.65em .9em; border-radius:.4em; font-size:1.45em; font-weight:700; border:2px solid var(--gb-line); background:var(--gb-surface); display:flex; align-items:center; gap:12px; text-align:left; }
+  .gb-choice.correct{ background:var(--gold); border-color:var(--gold-soft); color:#2A2208; }
+  .gb-choice-idx{ width:1.5em; height:1.5em; flex-shrink:0; border-radius:99px; background:var(--gb-surface2); display:flex; align-items:center; justify-content:center; font-size:.75em; }
   .gb-choice.correct .gb-choice-idx{ background:rgba(0,0,0,.15); }
-  .gb-reveal-btn{ padding:16px 34px; border-radius:18px; background:#fff; color:var(--ink); font-weight:800; font-size:17px; box-shadow:0 8px 24px rgba(0,0,0,.3); }
-  .gb-answer-card{ background:linear-gradient(135deg,var(--gold),var(--gold-deep)); border-radius:20px; padding:20px 26px; max-width:560px; width:100%; color:#3a2c02; }
-  .gb-answer-label{ font-size:13px; font-weight:800; opacity:.75; margin-bottom:4px; }
-  .gb-answer-text{ font-size:24px; font-weight:800; white-space:pre-wrap; }
-  .gb-author{ margin-top:16px; color:rgba(255,255,255,.65); font-size:14px; }
-  .gb-author b{ color:#fff; }
-  .gb-bottombar{ display:flex; align-items:center; justify-content:center; gap:10px; padding:22px; border-top:1px solid var(--navy-line); flex-wrap:wrap; }
-  .gb-nav-btn{ padding:14px 22px; border-radius:14px; background:rgba(255,255,255,.1); color:#fff; font-weight:700; }
+  .gb-reveal-btn{ padding:.7em 1.7em; border-radius:.6em; background:var(--gb-fg); color:var(--gb-bg); font-weight:800; font-size:1.1em; box-shadow:0 8px 24px rgba(0,0,0,.3); }
+  .gb-answer-card{ background:var(--gold); border-radius:.5em; padding:.8em 1.3em; max-width:min(90vw, 1600px); width:auto; min-width:min(28em, 90vw); color:#2A2208; }
+  .gb-answer-label{ font-size:.75em; font-weight:800; opacity:.75; margin-bottom:.2em; }
+  .gb-answer-text{ font-size:2em; font-weight:800; white-space:pre-wrap; line-height:1.3; }
+  .gb-author{ margin-top:.8em; color:var(--gb-muted); font-size:.85em; }
+  .gb-author b{ color:var(--gb-fg); }
+  .gb-bottombar{ display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:.6em; padding:.6em 1em; border-top:1px solid var(--gb-line); }
+  .gb-bottom-center{ display:flex; gap:.45em; justify-content:center; }
+  .gb-bottom-side{ min-width:0; }
+  .gb-keys{ text-align:right; font-size:.65em; color:var(--gb-faint); }
+  .gb-nav-main{ padding:.65em 1.5em; font-size:1em; }
+  @media(max-width:760px){ .gb-bottombar{ grid-template-columns:1fr; justify-items:center; } .gb-keys{ display:none; } }
+  .gb-nav-btn{ padding:.65em 1.1em; border-radius:.5em; background:var(--gb-surface2); color:var(--gb-fg); font-weight:700; font-size:.95em; }
   .gb-nav-btn:disabled{ opacity:.3; }
   .gb-empty{ min-height:calc(100vh - var(--footer-h)); display:flex; align-items:center; justify-content:center; text-align:center; padding:24px; }
   .gb-summary{ min-height:calc(100vh - var(--footer-h)); display:flex; align-items:center; justify-content:center; padding:50px 20px; text-align:center; }
-  .gb-summary-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; max-width:640px; margin:0 auto 22px; }
-  .gb-summary-box{ background:rgba(255,255,255,.06); border-radius:18px; padding:16px; text-align:left; }
-  .gb-summary-detail{ display:grid; grid-template-columns:1fr; gap:12px; max-width:640px; margin:0 auto; text-align:left; }
+  .gb-summary-grid{ display:grid; grid-template-columns:1fr 1fr; gap:.6em; max-width:min(1100px, 90vw); margin:0 auto 1em; }
+  .gb-summary-box{ background:var(--gb-surface); border-radius:.6em; padding:.8em 1em; text-align:left; }
+  .gb-summary-detail{ display:grid; grid-template-columns:1fr; gap:.6em; max-width:min(1100px, 90vw); margin:0 auto; text-align:left; }
   @media(min-width:640px){ .gb-summary-detail{ grid-template-columns:1fr 1fr; } }
+  /* 골든벨 화면 색 (어두운 화면 기본, 밝은 화면은 body.gb-light) */
+  /* 칠판 (기본) */
+  body.page-goldenbell{
+    --gb-bg:#1F3A32; --gb-fg:#F4F3EC; --gb-muted:rgba(244,243,236,.62); --gb-faint:rgba(244,243,236,.38);
+    --gb-line:rgba(244,243,236,.16); --gb-surface:rgba(244,243,236,.05); --gb-surface2:rgba(244,243,236,.1);
+    --gb-panel:#26463C; --gb-input:#2F5348; --gb-strong:#E6E5DC;
+    background-image:radial-gradient(ellipse at 30% 20%, rgba(255,255,255,.035), transparent 60%);
+  }
+  /* 화이트보드 (전자칠판 밝은 화면) */
+  body.page-goldenbell.gb-light{
+    --gb-bg:#FBFBF8; --gb-fg:#1C2420; --gb-muted:#5F6964; --gb-faint:#9AA39E;
+    --gb-line:#DADFD8; --gb-surface:#FFFFFF; --gb-surface2:#ECF0EA;
+    --gb-panel:#FFFFFF; --gb-input:#F1F4EF; --gb-strong:#2A332E;
+    background-image:none;
+  }
+  /* 칠판 아래 분필 받침 */
+  body.page-goldenbell:not(.gb-light) .gb-bottombar{ border-top:10px solid #6E5236; background:rgba(0,0,0,.12); }
+  body.page-goldenbell:not(.gb-light) .gb-choice{ background:transparent; border:2px solid rgba(244,243,236,.32); }
+  body.page-goldenbell:not(.gb-light) .gb-choice.correct{ background:var(--gold); border-color:var(--gold); }
+  .gb-text-btn{ padding:.5em .8em; border-radius:.4em; background:var(--gb-surface2); color:var(--gb-fg); font-weight:700; font-size:.72em; white-space:nowrap; }
+  .gb-text-btn:hover{ background:var(--gb-line); }
+  .gb-summary-bell{ color:var(--gold); font-size:2.6em; }
+  /* 골든벨 화면의 문단 기본 여백(글자 크기에 비례해 커짐) 없애기 */
+  .gb-body p, .gb-answer-card p{ margin-top:0; margin-bottom:0; }
+  .gb-question{ margin-top:.15em; }
+  .gb-answer-label{ margin-bottom:.15em; }
+  body.page-goldenbell.gb-light .gb-qnum{ color:var(--gold-deep); }
+  body.page-goldenbell.gb-light .gb-choice{ box-shadow:0 2px 10px rgba(0,0,0,0); }
+  body.page-goldenbell.gb-light .gb-settings-panel{ box-shadow:0 10px 30px rgba(0,0,0,.15); }
 </style>
 </head>
 <body>
@@ -187,7 +286,7 @@
 
 <script type="module">
 /* =========================================================================
-   🏆 학교 골든벨 문제은행 - 단일 HTML 앱
+   학교 골든벨 문제은행 - 단일 HTML 앱
    화면: 학생(#/), 관리자(#/admin), 골든벨 진행(#/goldenbell)
    made by m00n
    ========================================================================= */
@@ -303,7 +402,7 @@ function applyUnitSettings(data) {
   UNITS = data && data.units && typeof data.units === "object" ? data.units : {};
   GRADE_TERM = data && typeof data.gradeTerm === "string" ? data.gradeTerm : "";
 }
-function subjectWithUnit(q) { return q.unit ? `${q.subject} · ${q.unit}` : q.subject; }
+function subjectWithUnit(q) { return q.unit ? `${q.subject} ${q.unit}` : q.subject; }
 const QUESTION_TYPES = { MULTIPLE: "객관식", ESSAY: "서술형" };
 const CHOICE_COUNT = 4;
 const REVEAL_MODES = { FULL_NAME: "실명 공개", NAME_ONLY: "이름만 공개", ANONYMOUS: "익명", AFTER_ANSWER: "정답 공개 후 표시" };
@@ -323,6 +422,7 @@ function submitCountKey(ownerId, info) {
 }
 const STORAGE_KEYS = { STUDENT_DRAFT: "goldenbell_student_draft", STUDENT_INFO: "goldenbell_student_info", STUDENT_HISTORY: "goldenbell_student_history" };
 const ACTIVE_QUIZ_KEY = "goldenbell_active_quiz";
+const BELL_SVG = `<svg class="bell" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.8 0 1.4.6 1.4 1.4v.6c3 .7 5.1 3.4 5.1 6.6v4.4l1.6 2.2c.4.6 0 1.3-.7 1.3H4.6c-.7 0-1.1-.7-.7-1.3l1.6-2.2v-4.4c0-3.2 2.1-5.9 5.1-6.6v-.6c0-.8.6-1.4 1.4-1.4z" fill="currentColor"/><path d="M9.6 20.2h4.8a2.4 2.4 0 0 1-4.8 0z" fill="currentColor"/></svg>`;
 const ADMIN_USER_KEY = "goldenbell_admin_user"; // 화면에 보여줄 아이디(대소문자 그대로)
 const ID_PATTERN = /^[A-Za-z0-9]+$/;
 const PW_PATTERN = /^[A-Za-z0-9]+$/;
@@ -607,8 +707,6 @@ onAuthStateChanged(auth, async (user) => {
   // 로그인 상태가 실제로 바뀌었을 때만 다시 그림 (오류 문구가 지워지지 않도록)
   if (!authBusy && getRoute().route === "admin" && adminState() !== shownState) render();
 });
-if (document.readyState === "loading") window.addEventListener("DOMContentLoaded", render);
-else render();
 
 /* =========================================================================
    학생 화면
@@ -630,7 +728,7 @@ function renderJoinCodeGate() {
       <div class="center-screen">
         <div class="card fade-in" style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:14px;">
           <div style="text-align:center;">
-            <div style="font-size:40px;margin-bottom:6px;">🏆</div>
+            <div class="gate-bell">${BELL_SVG}</div>
             <h1 style="font-size:18px;font-weight:800;">골든벨 참여 코드 입력</h1>
             <p style="font-size:13px;color:var(--ink-soft);margin-top:4px;">선생님께서 알려주신 참여 코드를 입력해주세요.</p>
           </div>
@@ -640,7 +738,7 @@ function renderJoinCodeGate() {
             <p class="error-box" id="join-error" style="display:${errorMsg ? "block" : "none"};text-align:center;">${esc(errorMsg)}</p>
             <button type="submit" class="btn btn-gold" style="width:100%;" ${submitting ? "disabled" : ""}>${submitting ? "확인 중..." : "참여하기"}</button>
           </form>
-          <a href="#/admin" class="btn btn-ghost" style="text-align:center;padding:10px;font-size:12px;">👩‍🏫 관리자 화면</a>
+          <a href="#/admin" class="btn btn-ghost" style="text-align:center;padding:10px;font-size:12px;">관리자 화면</a>
         </div>
       </div>`;
 
@@ -699,7 +797,7 @@ function renderStudentPage(ownerId) {
   }
   const remainingCount = () => (maxPerStudent > 0 && serverCount !== null) ? Math.max(0, maxPerStudent - serverCount) : null;
   const practiceLink = () => practiceOpen
-    ? `<a href="#/o/${ownerId}/practice" class="btn btn-dark" style="display:block;text-align:center;width:100%;margin-top:14px;">📚 골든벨 연습하기</a>`
+    ? `<a href="#/o/${ownerId}/practice" class="btn btn-dark" style="display:block;text-align:center;width:100%;margin-top:14px;">골든벨 연습하기</a>`
     : "";
 
   // 이 기기에서 낸 문제 기록 (학생별로 구분해서 '지금까지 낸 문제'를 보여줌)
@@ -720,12 +818,12 @@ function renderStudentPage(ownerId) {
     if (items.length === 0) return "";
     return `
       <div style="margin-top:14px;background:var(--cream);border-radius:14px;padding:14px 16px;text-align:left;">
-        <p style="font-size:13px;font-weight:700;color:var(--ink);margin:0 0 8px;">📝 지금까지 낸 문제 ${items.length}개</p>
+        <p style="font-size:13px;font-weight:700;color:var(--ink);margin:0 0 8px;">지금까지 낸 문제 ${items.length}개</p>
         <div style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;">
           ${items.slice().reverse().map((h, i) => `
             <div style="display:flex;gap:8px;font-size:13px;color:var(--ink-soft);">
               <span style="flex-shrink:0;font-weight:700;color:var(--gold-deep);">${items.length - i}.</span>
-              <span style="flex-shrink:0;background:#fff;border-radius:99px;padding:1px 8px;font-size:11px;font-weight:700;color:var(--ink);">${esc(h.unit ? `${h.subject} ${h.unit}` : h.subject)}${h.page ? ` ${esc(h.page)}쪽` : ""}</span>
+              <span style="flex-shrink:0;background:#fff;border-radius:99px;padding:1px 8px;font-size:12px;font-weight:700;color:var(--ink);">${esc(h.unit ? `${h.subject} ${h.unit}` : h.subject)}${h.page ? ` ${esc(h.page)}쪽` : ""}</span>
               <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(h.preview)}</span>
             </div>`).join("")}
         </div>
@@ -756,9 +854,9 @@ function renderStudentPage(ownerId) {
     if (!submissionOpen) {
       app.innerHTML = `<div class="center-screen"><div class="fade-in" style="text-align:center;max-width:340px;">
         <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
-          <a href="#/admin" class="btn btn-ghost" style="padding:8px 14px;font-size:12px;font-weight:700;">👩‍🏫 관리자 화면</a>
+          <a href="#/admin" class="btn btn-ghost" style="padding:8px 14px;font-size:12px;font-weight:700;">관리자 화면</a>
         </div>
-        <div style="font-size:52px;margin-bottom:12px;">🔔</div>
+        <div class="gate-bell">${BELL_SVG}</div>
         <h1 style="font-size:19px;font-weight:800;">현재 문제 접수가 종료되었습니다.</h1>
         <p style="color:var(--ink-soft);margin-top:8px;">선생님께서 접수를 다시 열면 이용하실 수 있어요.</p>
         ${practiceLink()}
@@ -767,11 +865,11 @@ function renderStudentPage(ownerId) {
     }
     app.innerHTML = `
       <div class="student-wrap">
-        <div style="display:flex;justify-content:flex-end;margin-bottom:-6px;">
-          <a href="#/admin" class="btn btn-ghost" style="padding:8px 14px;font-size:12px;font-weight:700;">👩‍🏫 관리자 화면</a>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+          <a href="#/admin" class="btn btn-ghost" style="padding:7px 12px;font-size:12px;font-weight:700;">관리자 화면</a>
         </div>
-        <div class="brand">🏆 학교 골든벨 문제 제출</div>
-        <p class="brand-sub">문제는 여러 개 낼 수 있어요. 내가 낸 문제가 골든벨에 나올지도 몰라요!</p>
+        <div class="brand">${BELL_SVG}학교 골든벨</div>
+        <p class="brand-sub">우리가 낸 문제로 골든벨을 열어요. 여러 문제를 내도 됩니다.</p>
         <div class="dots" id="dots"></div>
         <div class="card" id="step-container"></div>
         ${practiceLink()}
@@ -822,80 +920,84 @@ function renderStudentPage(ownerId) {
   function questionStepHTML() {
     const isMultiple = draft.type === QUESTION_TYPES.MULTIPLE;
     const doneCount = myHistory().length;
+    const units = unitsFor(draft.subject);
     return `
-      <div class="fade-in" style="display:flex;flex-direction:column;gap:20px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:var(--ink-soft);margin-bottom:-6px;">
-          <span><b style="color:var(--ink);">${esc(studentInfo.studentClass)} ${esc(studentInfo.number)}번 ${esc(studentInfo.name)}</b></span>
-          <span style="background:${doneCount ? "var(--gold-soft)" : "#F1EDE0"};color:${doneCount ? "var(--gold-deep)" : "var(--ink-soft)"};border-radius:99px;padding:4px 10px;font-weight:700;font-size:12px;">${doneCount ? `${doneCount + 1}번째 문제 작성 중` : "첫 번째 문제"}${remainingCount() !== null ? ` · 앞으로 ${remainingCount()}개 더 낼 수 있어요` : ""}</span>
+      <div class="fade-in" style="display:flex;flex-direction:column;gap:16px;">
+        <div class="who-row">
+          <span class="who-chip">${esc(studentInfo.studentClass)} ${esc(studentInfo.number)}번 ${esc(studentInfo.name)}</span>
+          <span class="count-chip ${doneCount ? "on" : ""}">${doneCount ? `${doneCount + 1}번째 문제` : "첫 번째 문제"}${remainingCount() !== null ? `, ${remainingCount()}개 더 낼 수 있음` : ""}</span>
         </div>
-        <div>
-          <label class="label">과목</label>
-          <div class="grid4">
-            ${SUBJECTS.map((s) => `<button type="button" class="pill-btn subj-btn ${draft.subject === s ? "active" : ""}" data-subject="${esc(s)}">${esc(s)}</button>`).join("")}
+
+        <div class="q-section">
+          <p class="q-section-title"><span class="q-step">1</span>어디에서 낸 문제인가요?</p>
+          <div>
+            <label class="label">과목</label>
+            <div class="grid4">
+              ${SUBJECTS.map((s) => `<button type="button" class="pill-btn subj-btn ${draft.subject === s ? "active" : ""}" data-subject="${esc(s)}">${esc(s)}</button>`).join("")}
+            </div>
+          </div>
+          ${units.length ? `
+          <div>
+            <label class="label">단원 <span style="font-weight:600;font-size:12px;color:var(--ink-soft);">(${esc(gradeTermLabel(GRADE_TERM))})</span></label>
+            <select class="input" id="unit-select">
+              <option value="">단원을 골라주세요</option>
+              ${units.map((u) => `<option value="${esc(u)}" ${draft.unit === u ? "selected" : ""}>${esc(u)}</option>`).join("")}
+            </select>
+          </div>` : ""}
+          <div>
+            <label class="label">교과서 쪽수</label>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input class="input" type="text" inputmode="numeric" id="page-input" placeholder="예: 45 또는 45~46" maxlength="9" value="${esc(draft.page)}" ${draft.noPage ? "disabled" : ""} style="flex:1;${draft.noPage ? "opacity:.45;" : ""}">
+              <span style="font-weight:700;color:var(--ink-soft);">쪽</span>
+            </div>
+            <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;color:var(--ink-soft);cursor:pointer;">
+              <input type="checkbox" id="no-page-check" ${draft.noPage ? "checked" : ""} style="accent-color:var(--gold);width:16px;height:16px;">
+              교과서에 없는 내용이에요
+            </label>
           </div>
         </div>
-        ${unitsFor(draft.subject).length ? `
-        <div>
-          <label class="label">단원 <span style="font-weight:600;font-size:12px;color:var(--ink-soft);">(${esc(gradeTermLabel(GRADE_TERM))})</span></label>
-          <select class="input" id="unit-select">
-            <option value="">단원을 골라주세요</option>
-            ${unitsFor(draft.subject).map((u) => `<option value="${esc(u)}" ${draft.unit === u ? "selected" : ""}>${esc(u)}</option>`).join("")}
-          </select>
-        </div>` : ""}
-        <div>
-          <label class="label">교과서 쪽수</label>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <input class="input" type="text" inputmode="numeric" id="page-input" placeholder="예: 45 또는 45~46" maxlength="9" value="${esc(draft.page)}" ${draft.noPage ? "disabled" : ""} style="flex:1;${draft.noPage ? "opacity:.45;" : ""}">
-            <span style="font-weight:700;color:var(--ink-soft);">쪽</span>
-          </div>
-          <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;color:var(--ink-soft);cursor:pointer;">
-            <input type="checkbox" id="no-page-check" ${draft.noPage ? "checked" : ""} style="accent-color:var(--gold);width:16px;height:16px;">
-            교과서에 없는 내용이에요
-          </label>
-        </div>
-        <div>
-          <label class="label">문제 유형</label>
-          <div class="grid3" style="grid-template-columns:1fr 1fr;">
+
+        <div class="q-section">
+          <p class="q-section-title"><span class="q-step">2</span>문제를 만들어요</p>
+          <div class="seg">
             ${Object.values(QUESTION_TYPES).map((t) => `
-              <label class="pill-btn type-radio ${draft.type === t ? "active" : ""}" style="display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;">
-                <input type="radio" name="qtype" value="${t}" ${draft.type === t ? "checked" : ""} style="accent-color:var(--gold);">
-                ${t}
+              <label class="seg-btn type-radio ${draft.type === t ? "active" : ""}">
+                <input type="radio" name="qtype" value="${t}" ${draft.type === t ? "checked" : ""}>
+                ${t === QUESTION_TYPES.MULTIPLE ? "" : ""}${t}
               </label>`).join("")}
           </div>
-        </div>
-        <div>
-          <label class="label">문제</label>
-          <textarea class="input" id="q-input" rows="4" placeholder="문제를 입력하세요" style="resize:vertical;">${esc(draft.question)}</textarea>
-        </div>
-        ${isMultiple ? `
-        <div>
-          <label class="label">보기</label>
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            ${Array.from({ length: CHOICE_COUNT }).map((_, i) => `
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span class="choice-idx">${i + 1}</span>
-                <input class="input choice-input" data-idx="${i}" type="text" placeholder="보기 ${i + 1}" value="${esc(draft.choices[i] || "")}">
-              </div>`).join("")}
+          <div>
+            <label class="label">문제</label>
+            <textarea class="input" id="q-input" rows="3" placeholder="문제를 입력하세요" style="resize:vertical;">${esc(draft.question)}</textarea>
           </div>
-          <label class="label" style="margin-top:12px;">정답 번호</label>
-          <div class="grid4">
-            ${Array.from({ length: CHOICE_COUNT }).map((_, i) => `<button type="button" class="pill-btn correct-btn ${draft.correctChoice === String(i + 1) ? "active" : ""}" data-idx="${i + 1}">${i + 1}</button>`).join("")}
+          ${isMultiple ? `
+          <div>
+            <label class="label">보기 <span style="font-weight:600;font-size:12px;color:var(--ink-soft);">— 정답 보기의 번호를 눌러 표시해요</span></label>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              ${Array.from({ length: CHOICE_COUNT }).map((_, i) => `
+                <div class="choice-row">
+                  <button type="button" class="choice-mark correct-btn ${draft.correctChoice === String(i + 1) ? "active" : ""}" data-idx="${i + 1}" title="${i + 1}번을 정답으로">${i + 1}</button>
+                  <input class="input choice-input" data-idx="${i}" type="text" placeholder="보기 ${i + 1}" value="${esc(draft.choices[i] || "")}">
+                </div>`).join("")}
+            </div>
+          </div>` : ""}
+          <div>
+            <label class="label">${isMultiple ? "정답 설명 (선택)" : "모범 답안"}</label>
+            <textarea class="input" id="a-input" rows="2" placeholder="${isMultiple ? "비워 두면 고른 정답 보기가 자동으로 들어가요" : "모범 답안을 입력하세요"}" style="resize:vertical;">${esc(draft.answer)}</textarea>
           </div>
-        </div>` : ""}
-        <div>
-          <label class="label">${isMultiple ? "정답 설명 (선택)" : "모범 답안"}</label>
-          <textarea class="input" id="a-input" rows="${isMultiple ? 2 : 3}" placeholder="${isMultiple ? "비워 두면 고른 정답 보기가 자동으로 들어가요" : "모범 답안을 입력하세요"}" style="resize:vertical;">${esc(draft.answer)}</textarea>
         </div>
+
         ${error ? `<p class="error-box fade-in">${esc(error)}</p>` : ""}
         <div style="display:flex;gap:8px;">
           <button class="btn btn-ghost" id="prev-btn" style="flex:1;">이전</button>
-          <button class="btn btn-gold" id="submit-btn" style="flex:2;display:flex;align-items:center;justify-content:center;gap:8px;" ${submitting ? "disabled" : ""}>
+          <button class="btn btn-gold" id="submit-btn" style="flex:2;display:flex;align-items:center;justify-content:center;gap:8px;font-size:16px;" ${submitting ? "disabled" : ""}>
             ${submitting ? `<span class="spinner spin" style="width:16px;height:16px;border-width:2px;"></span>` : ""}
-            ${submitting ? "제출 중..." : "제출하기"}
+            ${submitting ? "제출 중..." : "제출하기 "}
           </button>
         </div>
       </div>`;
   }
+
 
   function successStepHTML() {
     if (!lastSubmitted) return "";
@@ -903,14 +1005,14 @@ function renderStudentPage(ownerId) {
     const reachedMax = remainingCount() === 0;
     return `
       <div class="pop" style="text-align:center;padding:14px 0;">
-        <div style="width:64px;height:64px;margin:0 auto 16px;border-radius:99px;background:var(--green-soft);display:flex;align-items:center;justify-content:center;font-size:30px;">✅</div>
+        <div style="width:64px;height:64px;margin:0 auto 16px;border-radius:99px;background:var(--green-soft);display:flex;align-items:center;justify-content:center;font-size:30px;"></div>
         <h2 style="font-size:18px;font-weight:800;">${items.length > 1 ? `${items.length}번째 문제가 등록되었습니다!` : "문제가 성공적으로 등록되었습니다!"}</h2>
-        <p style="font-size:13px;color:var(--ink-soft);margin-top:6px;">${esc(lastSubmitted.subject)} · ${lastSubmitted.submittedAt.toLocaleTimeString("ko-KR")}</p>
+        <p style="font-size:13px;color:var(--ink-soft);margin-top:6px;">${esc(lastSubmitted.subject)}, ${lastSubmitted.submittedAt.toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" })} 제출</p>
         ${historyListHTML(items)}
-        ${reachedMax ? `<p style="margin-top:14px;font-size:13px;font-weight:700;color:#946A08;background:#FEF3DC;border-radius:12px;padding:10px 12px;">한 사람당 ${maxPerStudent}개까지 낼 수 있어요. 모두 냈어요! 🎉</p>` : ""}
+        ${reachedMax ? `<p style="margin-top:14px;font-size:13px;font-weight:700;color:#7E5C0E;background:#F5E7BC;border-radius:12px;padding:10px 12px;">한 사람당 ${maxPerStudent}개까지 낼 수 있어요. 모두 냈어요! </p>` : ""}
         <div style="display:flex;flex-direction:column;gap:8px;margin-top:20px;">
           ${reachedMax ? "" : `
-          <button class="btn btn-gold" id="another-same-btn" style="width:100%;">➕ ${esc(lastSubmitted.subject)} 문제 하나 더 내기</button>
+          <button class="btn btn-gold" id="another-same-btn" style="width:100%;">${esc(lastSubmitted.subject)} 문제 하나 더 내기</button>
           <button class="btn btn-ghost" id="another-btn" style="width:100%;">다른 과목 문제 내기</button>`}
           <button class="btn btn-ghost" id="change-student-btn" style="width:100%;font-size:13px;padding:10px;background:none;color:var(--ink-soft);">다른 학생으로 바꾸기</button>
         </div>
@@ -1100,12 +1202,12 @@ function renderPracticePage(ownerId) {
     paint();
   }
 
-  const backLink = `<a href="#/o/${ownerId}" class="btn btn-ghost" style="padding:8px 14px;font-size:12px;font-weight:700;">← 문제 내러 가기</a>`;
+  const backLink = `<a href="#/o/${ownerId}" class="btn btn-ghost" style="padding:8px 14px;font-size:12px;font-weight:700;">문제 내러 가기</a>`;
   function shell(inner) {
     return `<div class="student-wrap">
       <div style="display:flex;justify-content:flex-start;margin-bottom:12px;">${backLink}</div>
-      <div class="brand">📚 골든벨 연습하기</div>
-      <p class="brand-sub">친구들이 낸 문제를 미리 풀어 보며 골든벨을 준비해요!</p>
+      <div class="brand">${BELL_SVG}골든벨 연습</div>
+      <p class="brand-sub">친구들이 낸 문제를 미리 풀어 봅니다.</p>
       ${inner}
     </div>`;
   }
@@ -1118,7 +1220,7 @@ function renderPracticePage(ownerId) {
     if (open === null) return;
     if (!open) {
       app.innerHTML = `<div class="center-screen"><div class="fade-in" style="text-align:center;max-width:340px;">
-        <div style="font-size:52px;margin-bottom:12px;">📚</div>
+        <div class="gate-bell">${BELL_SVG}</div>
         <h1 style="font-size:19px;font-weight:800;">지금은 연습 모드가 꺼져 있어요.</h1>
         <p style="color:var(--ink-soft);margin-top:8px;">선생님께서 연습 모드를 켜면 이용할 수 있어요.</p>
         <div style="margin-top:16px;">${backLink}</div>
@@ -1190,11 +1292,11 @@ function renderPracticePage(ownerId) {
     app.innerHTML = shell(`
       <div class="bar-track" style="margin-bottom:16px;height:8px;"><div class="bar-fill" style="width:${((idx + 1) / set.length) * 100}%;"></div></div>
       <div class="card fade-in" style="display:flex;flex-direction:column;gap:16px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--ink-soft);font-weight:700;">
-          <span>${idx + 1} / ${set.length} · ${esc(subjectWithUnit(q))}</span>
-          <span>맞힌 문제 ${score}개</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span class="p-tag">${esc(subjectWithUnit(q))}</span>
+          <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">${idx + 1} / ${set.length} <span style="color:var(--red);margin-left:8px;">맞힘 ${score}</span></span>
         </div>
-        <p style="font-size:18px;font-weight:800;line-height:1.55;white-space:pre-wrap;margin:0;">${esc(q.question)}</p>
+        <p class="p-question">${esc(q.question)}</p>
         ${isMultiple ? `
           <div style="display:flex;flex-direction:column;gap:8px;">
             ${(q.choices || []).map((c, i) => {
@@ -1204,9 +1306,9 @@ function renderPracticePage(ownerId) {
                 if (n === correct) style = "background:var(--green-soft);border-color:var(--green);color:var(--green);";
                 else if (n === picked) style = "background:var(--red-soft);border-color:var(--red);color:var(--red);";
               }
-              return `<button type="button" class="pill-btn p-choice" data-n="${n}" style="display:flex;align-items:center;gap:10px;text-align:left;padding:13px 14px;${style}" ${picked !== null ? "disabled" : ""}>
+              return `<button type="button" class="p-choice" data-n="${n}" style="${style}" ${picked !== null ? "disabled" : ""}>
                 <span class="choice-idx">${n}</span><span style="flex:1;">${esc(c)}</span>
-                ${picked !== null && n === correct ? "⭕" : picked === n ? "❌" : ""}
+                ${picked !== null && n === correct ? `<span class="pen-mark">○</span>` : picked === n ? `<span class="pen-mark">／</span>` : ""}
               </button>`;
             }).join("")}
           </div>` : `
@@ -1220,16 +1322,16 @@ function renderPracticePage(ownerId) {
             ${results[idx] === undefined ? `
             <p style="font-size:13px;color:var(--ink-soft);text-align:center;margin:0;">내 답과 비교해 보고 스스로 채점해요.</p>
             <div style="display:flex;gap:8px;">
-              <button class="btn btn-green" id="p-self-o" style="flex:1;">⭕ 맞았어요</button>
-              <button class="btn btn-red" id="p-self-x" style="flex:1;">❌ 틀렸어요</button>
+              <button class="btn btn-green" id="p-self-o" style="flex:1;">맞았어요</button>
+              <button class="btn btn-red" id="p-self-x" style="flex:1;">틀렸어요</button>
             </div>` : ""}`}`}
         ${done ? `
           <div class="fade-in" style="border-radius:14px;padding:12px 14px;background:${results[idx] ? "var(--green-soft)" : "var(--red-soft)"};color:${results[idx] ? "var(--green)" : "var(--red)"};font-weight:700;font-size:14px;">
-            ${results[idx] ? "정답이에요! 👏" : `아쉬워요!${isMultiple ? ` 정답은 ${esc(correct)}번이에요.` : ""}`}
-            ${isMultiple && q.answer && q.answer !== (q.choices || [])[Number(correct) - 1] ? `<div style="font-weight:600;color:var(--ink);margin-top:6px;white-space:pre-wrap;">💡 ${esc(q.answer)}</div>` : ""}
-            ${q.page ? `<div style="font-weight:600;color:var(--ink-soft);margin-top:4px;">📖 ${esc(pageText(q))}${results[idx] ? "" : "을 다시 읽어 보세요."}</div>` : ""}
+            ${results[idx] ? "정답이에요! " : `아쉬워요!${isMultiple ? ` 정답은 ${esc(correct)}번이에요.` : ""}`}
+            ${isMultiple && q.answer && q.answer !== (q.choices || [])[Number(correct) - 1] ? `<div style="font-weight:600;color:var(--ink);margin-top:6px;white-space:pre-wrap;">${esc(q.answer)}</div>` : ""}
+            ${q.page ? `<div style="font-weight:600;color:var(--ink-soft);margin-top:4px;">${esc(pageText(q))}${results[idx] ? "" : "을 다시 읽어 보세요."}</div>` : ""}
           </div>
-          <button class="btn btn-gold" id="p-next" style="width:100%;">${idx === set.length - 1 ? "결과 보기" : "다음 문제 →"}</button>` : ""}
+          <button class="btn btn-gold" id="p-next" style="width:100%;">${idx === set.length - 1 ? "결과 보기" : "다음 문제"}</button>` : ""}
       </div>`);
     document.querySelectorAll(".p-choice").forEach((b) => b.onclick = () => {
       if (picked !== null) return;
@@ -1254,18 +1356,18 @@ function renderPracticePage(ownerId) {
     const pct = Math.round((score / set.length) * 100);
     app.innerHTML = shell(`
       <div class="card pop" style="text-align:center;">
-        <div style="font-size:48px;">${pct === 100 ? "🏆" : pct >= 70 ? "🎉" : "💪"}</div>
-        <h2 style="font-size:22px;font-weight:800;margin:8px 0 4px;">${set.length}문제 중 ${score}문제 맞혔어요!</h2>
+        <div class="score-big">${score}<small>/${set.length}</small></div>
+        <h2 style="font-size:20px;font-weight:800;margin:8px 0 4px;">${set.length}문제 중 ${score}문제를 맞혔어요</h2>
         <p style="color:var(--ink-soft);font-size:14px;margin:0;">${pct === 100 ? "완벽해요! 골든벨 준비 끝!" : pct >= 70 ? "잘했어요! 틀린 문제만 한 번 더 보면 완벽해요." : "틀린 문제를 다시 풀어 보며 실력을 키워요."}</p>
         ${wrong.length ? `
         <div style="margin-top:18px;text-align:left;background:var(--cream);border-radius:14px;padding:14px 16px;">
-          <p style="font-size:13px;font-weight:800;margin:0 0 10px;">❌ 틀린 문제 ${wrong.length}개</p>
+          <p style="font-size:13px;font-weight:800;margin:0 0 10px;">틀린 문제 ${wrong.length}개</p>
           <div style="display:flex;flex-direction:column;gap:10px;max-height:300px;overflow-y:auto;">
             ${wrong.map((q) => `
               <div style="font-size:13px;line-height:1.5;">
                 <div style="font-weight:700;color:var(--ink);white-space:pre-wrap;">${esc(q.question)}</div>
                 <div style="color:var(--green);font-weight:700;">정답: ${q.type === QUESTION_TYPES.MULTIPLE ? `${esc(q.correctChoice)}번 ${esc((q.choices || [])[Number(q.correctChoice) - 1] || "")}` : esc(q.answer)}</div>
-                ${q.page ? `<div style="color:var(--ink-soft);">📖 ${esc(pageText(q))}</div>` : ""}
+                ${q.page ? `<div style="color:var(--ink-soft);">${esc(pageText(q))}</div>` : ""}
               </div>`).join("")}
           </div>
         </div>` : ""}
@@ -1334,7 +1436,7 @@ function renderGoogleSetup() {
           </form>
           <div style="border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:10px;">
             <p style="font-size:13px;font-weight:800;margin:0;">이미 있는 아이디에 합류하기</p>
-            <p style="font-size:11px;color:var(--ink-soft);margin:0;line-height:1.5;">그 아이디로 로그인한 화면의 '👥 계정 관리'에서 연결 코드를 만들어 여기에 넣으면, 이 구글 계정으로도 같은 아이디를 관리할 수 있어요.</p>
+            <p style="font-size:12px;color:var(--ink-soft);margin:0;line-height:1.5;">그 아이디의 '계정 관리'에서 만든 연결 코드를 넣으세요.</p>
             <form id="gs-join-form" style="display:flex;gap:8px;">
               <input class="input" id="gs-invite" value="${esc(inviteVal)}" placeholder="연결 코드 8자리" maxlength="10" autocomplete="off" style="flex:1;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">
               <button type="submit" class="btn btn-dark" style="white-space:nowrap;padding:12px 14px;" ${submitting ? "disabled" : ""}>합류하기</button>
@@ -1462,7 +1564,7 @@ function renderAuthGate() {
           </form>
           <div style="display:flex;align-items:center;gap:10px;color:var(--ink-soft);font-size:12px;"><div style="flex:1;height:1px;background:var(--line);"></div>또는<div style="flex:1;height:1px;background:var(--line);"></div></div>
           ${googleButtonHTML(mode === "login" ? "Google로 로그인" : "Google로 가입하기")}
-          ${mode === "login" ? `<p style="font-size:11px;color:var(--ink-soft);margin:0;line-height:1.5;">비밀번호를 잊었다면 이 사이트를 관리하는 선생님께 '계정 초기화'를 부탁하세요. 초기화한 뒤 같은 아이디로 다시 가입하면 그동안의 문제와 설정은 그대로 남아 있어요.</p>` : ""}
+          ${mode === "login" ? `<p style="font-size:12px;color:var(--ink-soft);margin:0;line-height:1.5;">비밀번호를 잊었다면 사이트 관리 선생님께 계정 초기화를 요청하세요. 같은 아이디로 다시 가입하면 문제와 설정은 그대로 있습니다.</p>` : ""}
         </div>
       </div>`;
 
@@ -1589,46 +1691,71 @@ function renderAdminDashboard(ownerId) {
     <div class="admin-wrap">
       <div class="admin-head">
         <div style="display:flex;align-items:center;gap:10px;">
-          <div class="admin-title">🏆 골든벨 관리자</div>
+          <div class="admin-title">${BELL_SVG}골든벨 관리</div>
           <span class="live-dot" id="live-dot" style="display:none;"><span class="d"></span>실시간 업데이트 중</span>
         </div>
-        <div class="btn-group" style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:13px;color:var(--ink-soft);font-weight:600;">${esc(sessionStorage.getItem(ADMIN_USER_KEY) || ownerId)}님</span>
-          <button type="button" id="go-draw-btn" class="btn btn-gold" style="padding:10px 14px;font-size:13px;">골든벨 시작하기</button>
-          <button class="btn btn-ghost" id="account-btn" style="padding:10px 14px;font-size:13px;">👥 계정 관리</button>
-          ${hasPassword ? `<button class="btn btn-ghost" id="change-pw-btn" style="padding:10px 14px;font-size:13px;">비밀번호 변경</button>` : ""}
-          <button class="btn btn-ghost" id="logout-btn" style="padding:10px 14px;font-size:13px;">로그아웃</button>
+        <div class="head-actions">
+          <span class="user-chip">${esc(sessionStorage.getItem(ADMIN_USER_KEY) || ownerId)}</span>
+          <button class="head-link" id="account-btn">계정 관리</button>
+          ${hasPassword ? `<button class="head-link" id="change-pw-btn">비밀번호 변경</button>` : ""}
+          <button class="head-link" id="logout-btn">로그아웃</button>
+          <button type="button" id="go-draw-btn" class="btn btn-gold" style="padding:10px 16px;font-size:13px;">골든벨 시작하기</button>
         </div>
       </div>
 
       <div class="notice" id="notice"></div>
 
-      <div class="two-col">
-        <div id="stats-container"></div>
-        <div style="display:flex;flex-direction:column;gap:14px;">
-          <div class="card" id="submission-toggle-container"></div>
-          <div class="card" id="subject-manager-container"></div>
-          <div class="card" id="class-manager-container"></div>
-          <div class="card" id="unit-manager-container"></div>
-          <div class="card" id="join-code-container"></div>
-          <div class="card qr-box">
-            <p style="font-weight:700;font-size:14px;margin:0 0 10px;">학생 접속 QR코드</p>
-            <p style="font-size:12px;color:var(--ink-soft);margin:-4px 0 10px;">QR을 찍거나, 위 참여 코드를 직접 입력해도 접속할 수 있어요.</p>
-            <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
-              <div id="qr-canvas" style="padding:10px;background:#fff;border:1px solid var(--line);border-radius:14px;"></div>
-              <p id="qr-url" style="font-size:11px;color:var(--ink-soft);word-break:break-all;text-align:center;"></p>
-              <div style="display:flex;gap:8px;width:100%;">
-                <button class="btn btn-ghost" id="copy-url-btn" style="flex:1;font-size:12px;padding:9px;">URL 복사</button>
-                <button class="btn btn-gold" id="dl-qr-btn" style="flex:1;font-size:12px;padding:9px;">QR 다운로드</button>
+      <div id="stats-container"></div>
+
+      <nav class="tab-bar" id="admin-tabs">
+        <button type="button" class="tab-btn" data-tab="questions">문제 관리<span class="tab-count" id="pending-badge" style="display:none;"></span></button>
+        <button type="button" class="tab-btn" data-tab="draw">골든벨 시작</button>
+        <button type="button" class="tab-btn" data-tab="access">학생 접속·연습</button>
+        <button type="button" class="tab-btn" data-tab="settings">과목·반·단원</button>
+      </nav>
+
+      <section class="tab-panel" data-panel="access">
+        <div class="panel-grid">
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div class="card" id="join-code-container"></div>
+            <div class="card qr-box">
+              <p style="font-weight:700;font-size:14px;margin:0 0 10px;">학생 접속 QR코드</p>
+              <p style="font-size:12px;color:var(--ink-soft);margin:-4px 0 10px;">휴대폰 카메라로 찍으면 문제 내는 화면이 열립니다.</p>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+                <div id="qr-canvas" style="padding:10px;background:#fff;border:1px solid var(--line);border-radius:14px;"></div>
+                <p id="qr-url" style="font-size:12px;color:var(--ink-soft);word-break:break-all;text-align:center;"></p>
+                <div style="display:flex;gap:8px;width:100%;">
+                  <button class="btn btn-ghost" id="copy-url-btn" style="flex:1;font-size:12px;padding:9px;">URL 복사</button>
+                  <button class="btn btn-gold" id="dl-qr-btn" style="flex:1;font-size:12px;padding:9px;">QR 다운로드</button>
+                </div>
               </div>
             </div>
           </div>
+          <div class="card" id="submission-toggle-container"></div>
         </div>
-      </div>
+      </section>
 
-      <div id="draw-panel" style="margin-top:14px;"></div>
+      <section class="tab-panel" data-panel="settings">
+        <div class="panel-grid">
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div class="card" id="subject-manager-container"></div>
+            <div class="card" id="class-manager-container"></div>
+          </div>
+          <div class="card" id="unit-manager-container"></div>
+        </div>
+      </section>
 
-      <div class="card" style="margin-top:14px;display:flex;flex-direction:column;gap:12px;">
+      <section class="tab-panel" data-panel="draw">
+        <div id="draw-panel"></div>
+      </section>
+
+      <section class="tab-panel" data-panel="questions">
+      <details class="card charts-card" id="charts-details">
+        <summary>반별·과목별 제출 현황</summary>
+        <div id="charts-container" style="margin-top:12px;"></div>
+      </details>
+
+      <div class="card" style="margin-top:12px;display:flex;flex-direction:column;gap:12px;">
         <input class="input" id="filter-search" placeholder="이름, 문제 내용, 단원 검색" style="font-size:14px;padding:12px;">
         <div class="grid4">
           <select class="input" id="filter-class" style="padding:10px;font-size:13px;"><option value="">전체 반</option>${CLASSES.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join("")}</select>
@@ -1640,16 +1767,17 @@ function renderAdminDashboard(ownerId) {
       </div>
 
       <div class="btn-group" style="margin-top:12px;">
-        <button class="btn btn-green" id="bulk-approve-btn" style="font-size:13px;padding:11px 16px;">✅ 조회 결과 모두 승인</button>
-        <button class="btn btn-dark" id="csv-btn" style="font-size:13px;padding:11px 16px;">📥 CSV 다운로드 (현재 조회 결과)</button>
-        <button class="btn btn-gold" id="import-csv-btn" style="font-size:13px;padding:11px 16px;">📤 CSV 가져오기 (연습 문제로)</button>
+        <button class="btn btn-dark" id="bulk-approve-btn" style="font-size:13px;padding:11px 16px;">조회 결과 모두 승인</button>
+        <button class="btn btn-ghost" id="csv-btn" style="font-size:13px;padding:11px 16px;">CSV 다운로드 (현재 조회 결과)</button>
+        <button class="btn btn-ghost" id="import-csv-btn" style="font-size:13px;padding:11px 16px;">CSV 가져오기 (연습 문제로)</button>
         <input type="file" id="import-csv-input" accept=".csv,text/csv" style="display:none;">
-        <button class="btn btn-red" id="delete-class-btn" style="font-size:13px;padding:11px 16px;">🗑 선택한 반 전체 삭제 (필터의 반 기준)</button>
-        <button class="btn btn-red" id="delete-imported-btn" style="font-size:13px;padding:11px 16px;">🗑 가져온 연습 문제 전체 삭제</button>
+        <button class="btn btn-red" id="delete-class-btn" style="font-size:13px;padding:11px 16px;">선택한 반 전체 삭제 (필터의 반 기준)</button>
+        <button class="btn btn-red" id="delete-imported-btn" style="font-size:13px;padding:11px 16px;">가져온 연습 문제 전체 삭제</button>
       </div>
-      <p style="font-size:12px;color:var(--ink-soft);margin:8px 2px 0;">다른 반 선생님이 'CSV 다운로드'로 받은 파일을 가져오면 우리 반 <b>연습 모드</b>에서 풀 수 있어요. 가져온 문제는 골든벨 추첨에는 들어가지 않고, 표에서 '골든벨 포함'을 누르면 추첨 대상이 돼요.</p>
+      <p style="font-size:12px;color:var(--ink-soft);margin:8px 2px 0;">다른 반에서 내려받은 CSV를 가져오면 연습 문제로 쓸 수 있습니다. 골든벨 추첨에 넣으려면 표에서 '골든벨 포함'을 누르세요.</p>
 
       <div id="table-container" style="margin-top:12px;"></div>
+      </section>
     </div>`;
 
   // QR 코드
@@ -1668,9 +1796,16 @@ function renderAdminDashboard(ownerId) {
   };
 
   // href="#draw-panel"은 주소 해시를 바꿔 학생 화면으로 넘어가 버리므로 스크롤로 이동
-  document.getElementById("go-draw-btn").onclick = () => {
-    document.getElementById("draw-panel").scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  /* ---- 탭 ---- */
+  const TAB_KEY = "goldenbell_admin_tab";
+  function showTab(tab) {
+    document.querySelectorAll("#admin-tabs .tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+    document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("active", p.dataset.panel === tab));
+    try { sessionStorage.setItem(TAB_KEY, tab); } catch (e) {}
+  }
+  document.querySelectorAll("#admin-tabs .tab-btn").forEach((b) => b.onclick = () => showTab(b.dataset.tab));
+  showTab(sessionStorage.getItem(TAB_KEY) || "questions");
+  document.getElementById("go-draw-btn").onclick = () => { showTab("draw"); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   /* ---- 계정 관리: 구글 연결 / 여러 구글 계정 함께 쓰기 ---- */
   document.getElementById("account-btn").onclick = () => openAccountModal();
@@ -1699,17 +1834,17 @@ function renderAdminDashboard(ownerId) {
         </div>
         <div>
           <p style="font-size:13px;font-weight:800;margin:0 0 4px;">이 아이디를 함께 쓰는 구글 계정</p>
-          <p style="font-size:11px;color:var(--ink-soft);margin:0 0 8px;">연결된 계정은 모두 같은 문제·설정·학생 주소를 관리할 수 있어요. (예: 학교 계정과 개인 계정)</p>
+          <p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px;">여기 있는 계정은 모두 이 아이디의 문제와 설정을 관리할 수 있습니다.</p>
           ${Object.keys(members).length ? `<div style="display:flex;flex-direction:column;gap:6px;">${Object.entries(members).map(([uid, email]) => `
             <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:9px 12px;font-size:13px;">
               <span>${esc(email || "구글 계정")}${uid === user.uid ? ` <span style="color:var(--ink-soft);">(지금 로그인)</span>` : ""}</span>
-              ${uid === user.uid ? "" : `<button class="btn btn-red" data-unlink="${esc(uid)}" style="padding:6px 10px;font-size:11px;">연결 해제</button>`}
+              ${uid === user.uid ? "" : `<button class="btn btn-red" data-unlink="${esc(uid)}" style="padding:6px 10px;font-size:12px;">연결 해제</button>`}
             </div>`).join("")}</div>`
             : `<p style="font-size:12px;color:var(--ink-soft);margin:0;">아직 함께 쓰는 구글 계정이 없어요.</p>`}
         </div>
         <div style="border-top:1px solid var(--line);padding-top:14px;">
           <p style="font-size:13px;font-weight:800;margin:0 0 4px;">다른 구글 계정 추가하기</p>
-          <p style="font-size:11px;color:var(--ink-soft);margin:0 0 10px;line-height:1.6;">① 아래에서 연결 코드를 만들어요 (30분 동안 한 번 쓸 수 있어요).<br>② 추가할 구글 계정으로 관리자 화면에서 'Google로 로그인'을 해요.<br>③ "구글 계정으로 처음 오셨네요" 화면 아래 '이미 있는 아이디에 합류하기'에 코드를 넣어요.</p>
+          <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;line-height:1.6;">연결 코드를 만들고, 추가할 구글 계정으로 'Google로 로그인'을 한 뒤 첫 화면 아래 칸에 코드를 넣으세요. 코드는 30분 동안 한 번 쓸 수 있습니다.</p>
           <div id="acc-invite-box"></div>
           <button class="btn btn-gold" id="acc-make-invite" style="width:100%;padding:11px;font-size:13px;">연결 코드 만들기</button>
         </div>
@@ -1732,7 +1867,7 @@ function renderAdminDashboard(ownerId) {
           <div class="pop" style="text-align:center;background:var(--gold-soft);border-radius:14px;padding:14px;margin-bottom:10px;">
             <p style="margin:0 0 4px;font-size:12px;color:var(--gold-deep);font-weight:700;">연결 코드</p>
             <p style="margin:0;font-size:28px;font-weight:800;letter-spacing:.15em;color:var(--gold-deep);">${code}</p>
-            <p style="margin:6px 0 0;font-size:11px;color:var(--ink-soft);">${expires.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}까지 쓸 수 있어요</p>
+            <p style="margin:6px 0 0;font-size:12px;color:var(--ink-soft);">${expires.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}까지 쓸 수 있어요</p>
           </div>`;
       } catch (e) { console.error(e); showNotice("연결 코드를 만들지 못했어요."); }
     };
@@ -1807,7 +1942,7 @@ function renderAdminDashboard(ownerId) {
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">전체 문제 수</div><div class="stat-value">${total}</div></div>
         <div class="stat-card"><div class="stat-label">승인된 문제 수</div><div class="stat-value" style="color:var(--green);">${approved}</div></div>
-        <div class="stat-card"><div class="stat-label">미승인 문제 수</div><div class="stat-value" style="color:#946A08;">${pending}</div>${imported ? `<div style="font-size:11px;color:#3557A8;margin-top:2px;">+ 가져온 연습 문제 ${imported}개</div>` : ""}</div>
+        <div class="stat-card"><div class="stat-label">미승인 문제 수</div><div class="stat-value" style="color:#7E5C0E;">${pending}</div>${imported ? `<div style="font-size:12px;color:#3A5A86;margin-top:2px;">+ 가져온 연습 문제 ${imported}개</div>` : ""}</div>
         <div class="stat-card"><div class="stat-label">참여 학생 수</div><div class="stat-value" style="color:var(--gold-deep);">${studentSet.size}</div></div>
       </div>
       <div class="two-col" style="grid-template-columns:1fr 1fr;">
@@ -1820,6 +1955,13 @@ function renderAdminDashboard(ownerId) {
           ${bySubject.map((d) => `<div class="bar-row"><span class="bar-label">${esc(d.label)}</span><div class="bar-track"><div class="bar-fill" style="width:${(d.value / maxSubject) * 100}%;background:var(--green);"></div></div><span class="bar-val">${d.value}</span></div>`).join("")}
         </div>
       </div>`;
+    // 통계 카드는 위쪽에, 반별·과목별 그래프는 '문제 관리' 탭의 접이식 칸으로 옮김
+    const statsEl = document.getElementById("stats-container");
+    const charts = statsEl.querySelector(".two-col");
+    const chartsEl = document.getElementById("charts-container");
+    if (charts && chartsEl) { charts.style.marginTop = "0"; chartsEl.innerHTML = ""; chartsEl.appendChild(charts); }
+    const badge = document.getElementById("pending-badge");
+    if (badge) { badge.textContent = pending; badge.style.display = pending ? "inline-block" : "none"; badge.title = `승인을 기다리는 문제 ${pending}개`; }
     const poolCount = document.getElementById("approved-pool-count");
     if (poolCount) poolCount.textContent = questions.filter((q) => q.isApproved).length;
   }
@@ -1873,7 +2015,7 @@ function renderAdminDashboard(ownerId) {
     const lastClass = CLASSES[CLASSES.length - 1];
     document.getElementById("class-manager-container").innerHTML = `
       <p style="font-weight:700;font-size:14px;margin:0 0 10px;">반 관리</p>
-      <p style="font-size:11px;color:var(--ink-soft);margin:0 0 10px;">반은 마지막 반부터 순서대로만 삭제할 수 있습니다.</p>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">반은 마지막 반부터 순서대로만 삭제할 수 있습니다.</p>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
         ${CLASSES.map((c) => `
           <span style="display:inline-flex;align-items:center;gap:6px;background:var(--gold-soft);color:var(--gold-deep);border-radius:999px;padding:6px 10px 6px 12px;font-size:12px;font-weight:700;">
@@ -1933,12 +2075,12 @@ function renderAdminDashboard(ownerId) {
     const list = unitsFor(unitUI.subject, unitUI.gt);
     const custom = hasCustomUnits(unitUI.subject, unitUI.gt);
     const hasDefault = defaultUnitsFor(unitUI.subject, unitUI.gt).length > 0;
-    const sourceLabel = custom ? "✏️ 선생님이 수정한 목록" : hasDefault ? (unitUI.subject === "국어" ? "📘 기본 목록 (국정 국어 교과서 기준)" : "📘 기본 목록 (아이스크림 교과서 목차 기준)") : "기본 목록 없음 — 직접 입력해주세요";
+    const sourceLabel = custom ? "선생님이 수정한 목록" : hasDefault ? (unitUI.subject === "국어" ? "기본 목록 (국정 국어 교과서 기준)" : "기본 목록 (아이스크림 교과서 목차 기준)") : "기본 목록 없음 — 직접 입력해주세요";
     const filledSubjects = SUBJECTS.filter((s) => unitsFor(s, unitUI.gt).length > 0);
     el.innerHTML = `
       <p style="font-weight:700;font-size:14px;margin:0 0 4px;">단원 관리</p>
-      <p style="font-size:11px;color:var(--ink-soft);margin:0 0 10px;">학생이 문제를 낼 때 고를 단원 목록이에요. 수학·과학·사회·영어(아이스크림 교과서)와 국어 일부를 미리 채워 두었고, 자유롭게 고치거나 더하거나 지울 수 있어요. 목록이 비어 있는 과목은 단원 선택 없이 제출돼요.</p>
-      <div style="background:${GRADE_TERM ? "var(--green-soft)" : "#FEF3DC"};border-radius:12px;padding:10px 12px;font-size:12px;font-weight:700;color:${GRADE_TERM ? "var(--green)" : "#946A08"};margin-bottom:10px;">
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">학생이 문제를 낼 때 고르는 단원입니다. 한 줄에 한 단원씩 고치면 됩니다. 비워 두면 그 과목은 단원을 고르지 않습니다.</p>
+      <div style="background:${GRADE_TERM ? "var(--green-soft)" : "#F5E7BC"};border-radius:12px;padding:10px 12px;font-size:12px;font-weight:700;color:${GRADE_TERM ? "var(--green)" : "#7E5C0E"};margin-bottom:10px;">
         현재 출제 학년·학기: ${GRADE_TERM ? esc(gradeTermLabel(GRADE_TERM)) : "설정 안 됨 (학생에게 단원 선택이 안 보여요)"}
       </div>
       <div style="display:flex;gap:6px;margin-bottom:8px;">
@@ -1949,14 +2091,14 @@ function renderAdminDashboard(ownerId) {
           ${SUBJECTS.map((s) => `<option value="${esc(s)}" ${unitUI.subject === s ? "selected" : ""}>${esc(s)}${unitsFor(s, unitUI.gt).length ? ` (${unitsFor(s, unitUI.gt).length})` : ""}</option>`).join("")}
         </select>
       </div>
-      <p style="font-size:11px;font-weight:700;color:${custom ? "var(--gold-deep)" : "var(--ink-soft)"};margin:0 0 6px;">${sourceLabel}</p>
+      <p style="font-size:12px;font-weight:700;color:${custom ? "var(--gold-deep)" : "var(--ink-soft)"};margin:0 0 6px;">${sourceLabel}</p>
       <textarea class="input" id="unit-textarea" rows="6" placeholder="한 줄에 한 단원씩 입력하세요.&#10;예)&#10;1. 재미있는 나의 탐구&#10;2. 생물과 환경" style="font-size:13px;padding:10px;resize:vertical;">${esc(list.join("\n"))}</textarea>
-      <p style="font-size:11px;color:var(--ink-soft);margin:6px 0 10px;">${filledSubjects.length ? `${esc(gradeTermLabel(unitUI.gt))} 단원이 있는 과목: ${filledSubjects.map(esc).join(", ")}` : `${esc(gradeTermLabel(unitUI.gt))}에는 아직 단원이 없어요.`}</p>
+      <p style="font-size:12px;color:var(--ink-soft);margin:6px 0 10px;">${filledSubjects.length ? `${esc(gradeTermLabel(unitUI.gt))} 단원이 있는 과목: ${filledSubjects.map(esc).join(", ")}` : `${esc(gradeTermLabel(unitUI.gt))}에는 아직 단원이 없어요.`}</p>
       <div style="display:flex;gap:8px;">
         <button class="btn btn-gold" id="save-units-btn" style="flex:1;padding:9px;font-size:12px;">단원 저장</button>
         ${custom && hasDefault ? `<button class="btn btn-ghost" id="reset-units-btn" style="flex:1;padding:9px;font-size:12px;">기본값으로 되돌리기</button>` : ""}
       </div>
-      <button class="btn ${GRADE_TERM === unitUI.gt ? "btn-ghost" : "btn-dark"}" id="set-gt-btn" style="width:100%;margin-top:8px;padding:9px;font-size:12px;" ${GRADE_TERM === unitUI.gt ? "disabled" : ""}>${GRADE_TERM === unitUI.gt ? `✅ ${esc(gradeTermLabel(unitUI.gt))}로 출제 중` : `${esc(gradeTermLabel(unitUI.gt))}로 출제하기`}</button>`;
+      <button class="btn ${GRADE_TERM === unitUI.gt ? "btn-ghost" : "btn-dark"}" id="set-gt-btn" style="width:100%;margin-top:8px;padding:9px;font-size:12px;" ${GRADE_TERM === unitUI.gt ? "disabled" : ""}>${GRADE_TERM === unitUI.gt ? `${esc(gradeTermLabel(unitUI.gt))}로 출제 중` : `${esc(gradeTermLabel(unitUI.gt))}로 출제하기`}</button>`;
 
     document.getElementById("unit-gt-select").onchange = (e) => { unitUI.gt = e.target.value; unitUI.dirty = false; renderUnitManager(); };
     document.getElementById("unit-subject-select").onchange = (e) => { unitUI.subject = e.target.value; unitUI.dirty = false; renderUnitManager(); };
@@ -2010,7 +2152,7 @@ function renderAdminDashboard(ownerId) {
       <p style="font-weight:700;font-size:14px;margin:0 0 10px;">학생 참여 코드</p>
       ${joinCode ? `
         <p style="text-align:center;font-size:30px;font-weight:800;letter-spacing:.15em;color:var(--gold-deep);background:var(--gold-soft);border-radius:14px;padding:14px;margin:0 0 12px;">${esc(joinCode)}</p>
-        <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">학생이 접속 화면에서 이 코드를 입력하면 바로 참여할 수 있어요.</p>
+        <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">학생 접속 화면에 이 코드를 입력합니다.</p>
         <div style="display:flex;gap:8px;">
           <button class="btn btn-ghost" id="copy-code-btn" style="flex:1;font-size:12px;padding:9px;">코드 복사</button>
           <button class="btn btn-red" id="regen-code-btn" style="flex:1;font-size:12px;padding:9px;">새 코드 발급</button>
@@ -2088,17 +2230,17 @@ function renderAdminDashboard(ownerId) {
           ${[0, 1, 2, 3, 4, 5, 10, 20].includes(maxPerStudent) ? "" : `<option value="${maxPerStudent}" selected>${maxPerStudent}개</option>`}
         </select>
       </div>
-      <p style="font-size:11px;color:var(--ink-soft);margin:6px 0 0;">반·번호·이름이 같은 학생 기준으로 세요. 삭제한 문제도 횟수에 들어가니, 다시 내게 하려면 횟수를 초기화하세요.</p>
+      <p style="font-size:12px;color:var(--ink-soft);margin:6px 0 0;">반, 번호, 이름이 같으면 같은 학생으로 셉니다. 삭제한 문제도 횟수에 들어갑니다.</p>
       <button class="btn btn-ghost" id="reset-counts-btn" style="width:100%;margin-top:8px;padding:8px;font-size:12px;">학생별 제출 횟수 초기화</button>
       <div style="height:1px;background:var(--line);margin:14px 0;"></div>
-      <p style="font-weight:700;font-size:14px;margin:0 0 4px;">📚 학생 연습 모드</p>
-      <p style="font-size:11px;color:var(--ink-soft);margin:0 0 10px;">켜면 학생 화면에 '골든벨 연습하기'가 생겨요. 아래에서 고른 범위의 문제만 학생에게 공개되고(정답 포함), 나머지 문제는 학생이 볼 수 없어요. 문제를 승인·수정·가져오면 연습 문제에도 자동으로 반영돼요.</p>
+      <p style="font-weight:700;font-size:14px;margin:0 0 4px;">학생 연습 모드</p>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">켜면 학생 화면에 연습 버튼이 생깁니다. 고른 범위의 문제만 정답과 함께 학생에게 공개됩니다.</p>
       <select class="input" id="practice-scope-select" style="padding:9px;font-size:13px;margin-bottom:6px;">
         ${Object.entries(PRACTICE_SCOPES).map(([k, label]) => `<option value="${k}" ${practiceScope === k ? "selected" : ""}>${label}</option>`).join("")}
       </select>
-      ${practiceScope !== "imported" ? `<p style="font-size:11px;color:#946A08;margin:0 0 8px;">⚠️ 승인된 문제는 골든벨 추첨 대상이라, 연습에 공개하면 학생들이 정답을 미리 알 수 있어요.</p>` : ""}
+      ${practiceScope !== "imported" ? `<p style="font-size:12px;color:#7E5C0E;margin:0 0 8px;">승인된 문제를 공개하면 학생들이 골든벨 정답을 미리 볼 수 있습니다.</p>` : ""}
       <div style="display:flex;align-items:center;justify-content:space-between;">
-        <span style="font-weight:800;font-size:14px;color:${practiceOpen ? "var(--green)" : "var(--ink-soft)"};">${practiceOpen ? `연습 모드 켜짐 · ${practiceCount}문제 공개 중` : `연습 모드 꺼짐 · 공개할 문제 ${practiceCount}개`}</span>
+        <span style="font-weight:800;font-size:14px;color:${practiceOpen ? "var(--green)" : "var(--ink-soft)"};">${practiceOpen ? `켜짐, ${practiceCount}문제 공개 중` : `꺼짐 (공개할 문제 ${practiceCount}개)`}</span>
         <button class="btn ${practiceOpen ? "btn-ghost" : "btn-green"}" id="toggle-practice-btn" style="padding:9px 16px;font-size:12px;" ${toggling ? "disabled" : ""}>${practiceOpen ? "끄기" : "켜기"}</button>
       </div>`;
     document.getElementById("toggle-practice-btn").onclick = async () => {
@@ -2182,7 +2324,7 @@ function renderAdminDashboard(ownerId) {
     const m = new Map();
     questions.filter((q) => q.isApproved && q.unit).forEach((q) => {
       const key = `${q.subject}||${q.unit}`;
-      const cur = m.get(key) || { value: key, label: `${q.subject} · ${q.unit}`, count: 0 };
+      const cur = m.get(key) || { value: key, label: `${q.subject} ${q.unit}`, count: 0 };
       cur.count += 1; m.set(key, cur);
     });
     return [...m.values()].sort((a, b) => a.label.localeCompare(b.label, "ko", { numeric: true }));
@@ -2199,7 +2341,7 @@ function renderAdminDashboard(ownerId) {
     document.getElementById("draw-panel").innerHTML = `
       <div class="card" style="display:flex;flex-direction:column;gap:16px;">
         <div>
-          <p style="font-weight:700;font-size:14px;margin:0 0 3px;">🎲 랜덤 문제 추첨</p>
+          <p style="font-weight:700;font-size:14px;margin:0 0 3px;">랜덤 문제 추첨</p>
           <p style="font-size:12px;color:var(--ink-soft);margin:0;">승인된 문제 <span id="approved-pool-count">${approvedPool.length}</span>개 중에서 조건에 맞게 추첨합니다.</p>
         </div>
         <div>
@@ -2239,7 +2381,7 @@ function renderAdminDashboard(ownerId) {
             <span id="ratio-label" style="font-size:12px;font-weight:600;color:var(--ink-soft);width:150px;text-align:right;">객관식 ${draw.multiplePercent}% / 서술형 ${100 - draw.multiplePercent}%</span>
           </div>
         </div>
-        <button class="btn btn-dark" id="draw-btn" style="width:100%;">🎲 추첨하기</button>
+        <button class="btn btn-dark" id="draw-btn" style="width:100%;">추첨하기</button>
         <div id="draw-result-container"></div>
       </div>`;
 
@@ -2293,20 +2435,20 @@ function renderAdminDashboard(ownerId) {
     el.innerHTML = `
       <div class="fade-in" style="background:var(--gold-soft);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px;">
         <p style="font-weight:700;font-size:14px;margin:0;color:var(--gold-deep);">${r.picked.length}문항이 추첨되었습니다. (요청: ${r.requested}문항)</p>
-        ${r.shortage ? `<p style="font-size:12px;color:#946A08;margin:0;">⚠️ 조건에 맞는 문제가 부족해서 요청하신 수보다 적게 추첨되었습니다.</p>` : ""}
+        ${r.shortage ? `<p style="font-size:12px;color:#7E5C0E;margin:0;">조건에 맞는 문제가 부족해서 요청하신 수보다 적게 추첨되었습니다.</p>` : ""}
         ${r.picked.length === 0
           ? `<p style="font-size:12px;color:var(--ink-soft);margin:0;">조건에 맞는 승인된 문제가 없습니다. 조건을 조정해주세요.</p>`
           : `
           <div style="background:#fff;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:14px;margin-top:4px;">
-            <p style="font-weight:700;font-size:13px;margin:0;color:var(--ink);">⚙️ 시작 전 설정</p>
+            <p style="font-weight:700;font-size:13px;margin:0;color:var(--ink);">시작 전 설정</p>
             <div>
-              <p style="font-size:11px;color:var(--ink-soft);margin:0 0 6px;">출제자 공개 방식</p>
+              <p style="font-size:12px;color:var(--ink-soft);margin:0 0 6px;">출제자 공개 방식</p>
               <select id="pre-reveal-mode-select" class="input" style="width:100%;padding:9px;">
                 ${Object.values(REVEAL_MODES).map((m) => `<option value="${m}" ${s.revealMode === m ? "selected" : ""}>${m}</option>`).join("")}
               </select>
             </div>
             <div>
-              <p style="font-size:11px;color:var(--ink-soft);margin:0 0 6px;">타이머</p>
+              <p style="font-size:12px;color:var(--ink-soft);margin:0 0 6px;">타이머</p>
               <select id="pre-timer-select" class="input" style="width:100%;padding:9px;">
                 ${TIMER_OPTIONS.map((opt) => `<option value="${opt.value === null ? "null" : opt.value}" ${s.timerSeconds === opt.value ? "selected" : ""}>${opt.label}</option>`).join("")}
               </select>
@@ -2316,10 +2458,10 @@ function renderAdminDashboard(ownerId) {
               시간 종료 시 자동으로 다음 문제로 이동
             </label>
             <div>
-              <p style="font-size:11px;color:var(--ink-soft);margin:0 0 6px;">참가 학생 수 (선택) — 진행 화면에 '남은 학생 수'를 띄워요</p>
+              <p style="font-size:12px;color:var(--ink-soft);margin:0 0 6px;">참가 학생 수 (선택) — 진행 화면에 '남은 학생 수'를 띄워요</p>
               <input id="pre-participants" class="input" type="number" min="1" max="999" placeholder="예: 26" value="${esc(s.participants)}" style="width:100%;padding:9px;">
             </div>
-            <button class="btn btn-gold" id="start-gb-btn" style="width:100%;">🏆 이 설정으로 골든벨 시작하기</button>
+            <button class="btn btn-gold" id="start-gb-btn" style="width:100%;">이 설정으로 골든벨 시작하기</button>
           </div>`}
       </div>`;
     const revealSelect = document.getElementById("pre-reveal-mode-select");
@@ -2380,20 +2522,20 @@ function renderAdminDashboard(ownerId) {
               return `<tr>
                 <td>${esc(q.class)} / ${esc(q.number)}번</td>
                 <td>${esc(q.name)}</td>
-                <td>${esc(q.subject)}${q.unit ? `<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;max-width:150px;">${esc(q.unit)}</div>` : ""}</td>
+                <td>${esc(q.subject)}${q.unit ? `<div style="font-size:12px;color:var(--ink-soft);margin-top:2px;max-width:150px;">${esc(q.unit)}</div>` : ""}</td>
                 <td style="white-space:nowrap;color:${q.page ? "var(--ink)" : "var(--ink-soft)"};">${q.page ? `${esc(q.page)}쪽` : "-"}</td>
                 <td>${esc(q.type)}</td>
                 <td class="truncate q-row-click" data-open="${q.id}" title="눌러서 자세히 보기·수정">${esc(q.question)}</td>
                 <td class="truncate" style="max-width:140px;" title="${esc(q.answer)}">${esc(q.answer)}</td>
-                <td style="color:var(--ink-soft);font-size:11px;white-space:nowrap;">${createdAt}</td>
-                <td><span class="badge ${q.isApproved ? "approved" : "pending"}" ${!q.isApproved && q.isImported ? `style="background:#E8EEFB;color:#3557A8;"` : ""}>${q.isApproved ? "승인" : q.isImported ? "연습용" : "미승인"}</span>${q.isImported ? `<div style="font-size:10px;color:var(--ink-soft);margin-top:3px;white-space:nowrap;">가져옴</div>` : ""}</td>
+                <td style="color:var(--ink-soft);font-size:12px;white-space:nowrap;">${createdAt}</td>
+                <td><span class="badge ${q.isApproved ? "approved" : "pending"}" ${!q.isApproved && q.isImported ? `style="background:#E3EAF3;color:#3A5A86;"` : ""}>${q.isApproved ? "승인" : q.isImported ? "연습용" : "미승인"}</span>${q.isImported ? `<div style="font-size:11px;color:var(--ink-soft);margin-top:3px;white-space:nowrap;">가져옴</div>` : ""}</td>
                 <td>
                   <div style="display:flex;gap:6px;">
-                    <button class="btn btn-ghost" data-open="${q.id}" style="padding:7px 10px;font-size:11px;white-space:nowrap;">보기·수정</button>
+                    <button class="btn btn-ghost" data-open="${q.id}" style="padding:7px 10px;font-size:12px;white-space:nowrap;">보기·수정</button>
                     ${!q.isApproved
-                      ? `<button class="btn btn-gold" data-action="approve" data-id="${q.id}" style="padding:7px 10px;font-size:11px;white-space:nowrap;" ${disabled}>${q.isImported ? "골든벨 포함" : "승인"}</button>`
-                      : `<button class="btn btn-ghost" data-action="unapprove" data-id="${q.id}" style="padding:7px 10px;font-size:11px;white-space:nowrap;" ${disabled}>승인 취소</button>`}
-                    <button class="btn btn-red" data-action="delete" data-id="${q.id}" style="padding:7px 10px;font-size:11px;" ${disabled}>삭제</button>
+                      ? `<button class="btn btn-dark" data-action="approve" data-id="${q.id}" style="padding:7px 10px;font-size:12px;white-space:nowrap;" ${disabled}>${q.isImported ? "골든벨 포함" : "승인"}</button>`
+                      : `<button class="btn btn-ghost" data-action="unapprove" data-id="${q.id}" style="padding:7px 10px;font-size:12px;white-space:nowrap;" ${disabled}>승인 취소</button>`}
+                    <button class="btn btn-red" data-action="delete" data-id="${q.id}" style="padding:7px 10px;font-size:12px;" ${disabled}>삭제</button>
                   </div>
                 </td>
               </tr>`;
@@ -2444,9 +2586,9 @@ function renderAdminDashboard(ownerId) {
       const body = openModal("문제 자세히 보기·수정", `
         <div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--ink-soft);margin-bottom:14px;">
           <span class="badge ${q.isApproved ? "approved" : "pending"}">${q.isApproved ? "승인" : q.isImported ? "연습용" : "미승인"}</span>
-          <span>${esc(q.class)} ${esc(q.number)}번 ${esc(q.name)}</span><span>·</span><span>${esc(createdAt)}</span>
-          ${q.isImported ? `<span>· 가져옴${q.importedFrom ? ` (${esc(q.importedFrom)})` : ""}</span>` : ""}
-          ${q.editedAt ? `<span>· 선생님이 수정함</span>` : ""}
+          <span>${esc(q.class)} ${esc(q.number)}번 ${esc(q.name)}, ${esc(createdAt)}</span>
+          ${q.isImported ? `<span>(가져온 문제${q.importedFrom ? `: ${esc(q.importedFrom)}` : ""})</span>` : ""}
+          ${q.editedAt ? `<span>(수정함)</span>` : ""}
         </div>
         <div style="display:flex;flex-direction:column;gap:12px;">
           <div class="grid3" style="grid-template-columns:1fr 1fr 90px;">
@@ -2674,7 +2816,7 @@ function playBeep() {
   } catch (err) { console.warn("효과음 재생 실패:", err); }
 }
 function timerHTML(totalSeconds, remainingSeconds) {
-  if (totalSeconds === null || totalSeconds === undefined) return `<div class="timer-none">⏱ 제한 없음</div>`;
+  if (totalSeconds === null || totalSeconds === undefined) return `<div class="timer-none">제한 없음</div>`;
   const radius = 34, circumference = 2 * Math.PI * radius;
   const ratio = Math.max(0, Math.min(1, remainingSeconds / totalSeconds));
   const offset = circumference * (1 - ratio);
@@ -2683,7 +2825,7 @@ function timerHTML(totalSeconds, remainingSeconds) {
   const stroke = isDone ? "#DD4B3E" : isUrgent ? "#F0A93D" : "#E8B923";
   return `<div class="timer-wrap">
     <svg viewBox="0 0 80 80" class="timer-svg">
-      <circle cx="40" cy="40" r="${radius}" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="6"/>
+      <circle cx="40" cy="40" r="${radius}" fill="none" style="stroke:var(--gb-surface2)" stroke-width="6"/>
       <circle cx="40" cy="40" r="${radius}" fill="none" stroke="${stroke}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" style="transition:stroke-dashoffset 1s linear, stroke .3s;"/>
     </svg>
     <div class="timer-value ${isUrgent ? "urgent" : ""}">${Math.max(0, remainingSeconds)}</div>
@@ -2699,7 +2841,16 @@ function authorText(question, revealMode, answerRevealed) {
   }
 }
 
+// 골든벨 화면 밝기 (어두운 화면 / 밝은 화면) — 이 기기에 기억
+const GB_THEME_KEY = "goldenbell_gb_theme";
+function gbTheme() { try { return localStorage.getItem(GB_THEME_KEY) === "light" ? "light" : "dark"; } catch (e) { return "dark"; } }
+function applyGbTheme(theme) {
+  document.body.classList.toggle("gb-light", theme === "light");
+  try { localStorage.setItem(GB_THEME_KEY, theme); } catch (e) {}
+}
+
 function renderGoldenBellPage() {
+  applyGbTheme(gbTheme());
   let quizData = loadSession(ACTIVE_QUIZ_KEY, null);
   let index = 0, revealed = false, finished = false, showSettings = false, timeLeft = null, isFullscreen = !!document.fullscreenElement;
   let timerInterval = null, hasBeeped = false, advanceTimeout = null;
@@ -2799,11 +2950,15 @@ function renderGoldenBellPage() {
         <div class="gb-topbar" id="gb-topbar"></div>
         <div class="gb-body" id="gb-question-area"></div>
         <div class="gb-bottombar">
-          <button class="gb-nav-btn" id="prev-q-btn" ${index === 0 ? "disabled" : ""}>← 이전 문제</button>
-          <button class="gb-nav-btn" id="skip-q-btn">문제 건너뛰기</button>
-          ${isLast
-            ? `<button class="gb-nav-btn" id="finish-btn" style="background:var(--red);">🏁 골든벨 종료</button>`
-            : `<button class="gb-nav-btn" id="next-q-btn" style="background:var(--gold);color:#3a2c02;">다음 문제 →</button>`}
+          <div class="gb-bottom-side" id="gb-survivors-slot"></div>
+          <div class="gb-bottom-center">
+            <button class="gb-nav-btn" id="prev-q-btn" ${index === 0 ? "disabled" : ""}>이전</button>
+            <button class="gb-nav-btn" id="skip-q-btn">건너뛰기</button>
+            ${isLast
+              ? `<button class="gb-nav-btn gb-nav-main" id="finish-btn" style="background:var(--red);">골든벨 종료</button>`
+              : `<button class="gb-nav-btn gb-nav-main" id="next-q-btn" style="background:var(--gold);color:#2A2208;">다음 문제</button>`}
+          </div>
+          <div class="gb-bottom-side gb-keys">방향키로 문제 이동, 스페이스로 정답 보기</div>
         </div>
       </div>`;
     paintTopbar();
@@ -2823,13 +2978,13 @@ function renderGoldenBellPage() {
     if (!quizData.participants) return "";
     const n = quizData.survivors ?? quizData.participants;
     return `<div class="gb-survivors" title="남은 학생 수">
-      <button class="gb-icon-btn" id="surv-minus" title="탈락 1명" style="width:34px;height:34px;font-size:16px;">−</button>
-      <div style="text-align:center;min-width:64px;line-height:1.1;">
-        <div style="font-size:11px;color:rgba(255,255,255,.6);">남은 학생</div>
-        <div style="font-size:22px;font-weight:800;color:${n <= 3 ? "var(--gold)" : "#fff"};">${n}<span style="font-size:12px;color:rgba(255,255,255,.5);font-weight:600;"> / ${quizData.participants}</span></div>
+      <button class="gb-icon-btn" id="surv-minus" title="탈락 1명" style="font-size:.9em;">−</button>
+      <div style="text-align:center;min-width:3.6em;line-height:1.1;">
+        <div style="font-size:.6em;color:var(--gb-muted);">남은 학생</div>
+        <div style="font-size:1.35em;font-weight:800;color:${n <= 3 ? "var(--gold)" : "var(--gb-fg)"};">${n}<span style="font-size:.5em;color:var(--gb-muted);font-weight:600;"> / ${quizData.participants}</span></div>
       </div>
-      <button class="gb-icon-btn" id="surv-plus" title="1명 되살리기" style="width:34px;height:34px;font-size:16px;">+</button>
-      <button class="gb-icon-btn" id="surv-revive" title="패자부활: 모두 되살리기" style="width:34px;height:34px;font-size:14px;">↺</button>
+      <button class="gb-icon-btn" id="surv-plus" title="1명 되살리기" style="font-size:.9em;">+</button>
+      <button class="gb-text-btn" id="surv-revive">패자부활</button>
     </div>`;
   }
   function setSurvivors(n) {
@@ -2850,18 +3005,25 @@ function renderGoldenBellPage() {
     const percent = questions.length > 0 ? ((index + 1) / questions.length) * 100 : 0;
     document.getElementById("gb-topbar").innerHTML = `
       <div class="gb-progress">
-        <span style="font-weight:700;white-space:nowrap;">${index + 1} / ${questions.length}</span>
+        <span class="gb-count">${index + 1}<small> / ${questions.length}</small></span>
         <div class="gb-progress-track"><div class="gb-progress-fill" style="width:${percent}%;"></div></div>
       </div>
       <div class="gb-subject-chip">${esc(subjectWithUnit(q))}</div>
-      <div style="display:flex;align-items:center;gap:10px;">
-        ${survivorsHTML()}
+      <div class="gb-top-right">
         <span id="gb-timer">${timerHTML(settings.timerSeconds, timeLeft ?? 0)}</span>
-        <button class="gb-icon-btn" id="settings-toggle-btn" title="설정">⚙️</button>
-        <button class="gb-icon-btn" id="fullscreen-btn" title="전체 화면 (ESC로 종료)">${isFullscreen ? "⤡" : "⤢"}</button>
+        <button class="gb-text-btn" id="theme-toggle-btn">${gbTheme() === "light" ? "칠판 화면" : "화이트보드 화면"}</button>
+        <button class="gb-text-btn" id="settings-toggle-btn">설정</button>
+        <button class="gb-text-btn" id="fullscreen-btn">${isFullscreen ? "전체화면 끄기" : "전체화면"}</button>
       </div>
       ${showSettings ? settingsPanelHTML(settings) : ""}`;
+    const slot = document.getElementById("gb-survivors-slot");
+    if (slot) slot.innerHTML = survivorsHTML();
     document.getElementById("settings-toggle-btn").onclick = () => { showSettings = !showSettings; paintTopbar(); };
+    document.getElementById("theme-toggle-btn").onclick = (e) => {
+      applyGbTheme(gbTheme() === "light" ? "dark" : "light");
+      e.currentTarget.blur();
+      paintTopbar();
+    };
     document.getElementById("fullscreen-btn").onclick = toggleFullscreen;
     bindSurvivors();
     if (showSettings) bindSettingsPanel(settings);
@@ -2878,21 +3040,28 @@ function renderGoldenBellPage() {
       <div class="gb-settings-panel fade-in">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
           <p style="font-weight:800;font-size:14px;margin:0;">골든벨 설정</p>
-          <button id="close-settings-btn" style="background:none;color:rgba(255,255,255,.6);font-size:13px;">닫기</button>
+          <button id="close-settings-btn" style="background:none;color:var(--gb-muted);font-size:13px;">닫기</button>
         </div>
         <div style="margin-bottom:12px;">
-          <p style="font-size:11px;color:rgba(255,255,255,.5);margin:0 0 6px;">출제자 공개 방식</p>
-          <select id="reveal-mode-select" style="width:100%;padding:9px;border-radius:10px;background:#2E3346;color:#fff;border:1px solid var(--navy-line);">
+          <p style="font-size:12px;color:var(--gb-muted);margin:0 0 6px;">출제자 공개 방식</p>
+          <select id="reveal-mode-select" style="width:100%;padding:9px;border-radius:10px;background:var(--gb-input);color:var(--gb-fg);border:1px solid var(--gb-line);">
             ${Object.values(REVEAL_MODES).map((m) => `<option value="${m}" ${settings.revealMode === m ? "selected" : ""}>${m}</option>`).join("")}
           </select>
         </div>
         <div style="margin-bottom:12px;">
-          <p style="font-size:11px;color:rgba(255,255,255,.5);margin:0 0 6px;">타이머</p>
-          <select id="timer-select" style="width:100%;padding:9px;border-radius:10px;background:#2E3346;color:#fff;border:1px solid var(--navy-line);">
+          <p style="font-size:12px;color:var(--gb-muted);margin:0 0 6px;">타이머</p>
+          <select id="timer-select" style="width:100%;padding:9px;border-radius:10px;background:var(--gb-input);color:var(--gb-fg);border:1px solid var(--gb-line);">
             ${TIMER_OPTIONS.map((opt) => `<option value="${opt.value === null ? "null" : opt.value}" ${settings.timerSeconds === opt.value ? "selected" : ""}>${opt.label}</option>`).join("")}
           </select>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#ddd;">
+        <div style="margin-bottom:12px;">
+          <p style="font-size:12px;color:var(--gb-muted);margin:0 0 6px;">화면</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            <button type="button" class="gb-theme-opt" data-theme="dark" style="padding:9px;border-radius:8px;font-weight:700;font-size:13px;background:${gbTheme() === "dark" ? "var(--gold)" : "var(--gb-input)"};color:${gbTheme() === "dark" ? "#2A2208" : "var(--gb-fg)"};">칠판</button>
+            <button type="button" class="gb-theme-opt" data-theme="light" style="padding:9px;border-radius:8px;font-weight:700;font-size:13px;background:${gbTheme() === "light" ? "var(--gold)" : "var(--gb-input)"};color:${gbTheme() === "light" ? "#2A2208" : "var(--gb-fg)"};">화이트보드</button>
+          </div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--gb-strong);">
           <input type="checkbox" id="auto-advance-check" ${settings.autoAdvanceOnTimeout ? "checked" : ""} style="accent-color:var(--gold);width:16px;height:16px;">
           시간 종료 시 자동으로 다음 문제로 이동
         </label>
@@ -2900,6 +3069,7 @@ function renderGoldenBellPage() {
   }
   function bindSettingsPanel(settings) {
     document.getElementById("close-settings-btn").onclick = () => { showSettings = false; paintTopbar(); };
+    document.querySelectorAll(".gb-theme-opt").forEach((b) => b.onclick = () => { applyGbTheme(b.dataset.theme); paintTopbar(); });
     document.getElementById("reveal-mode-select").onchange = (e) => updateSettings({ ...settings, revealMode: e.target.value });
     document.getElementById("timer-select").onchange = (e) => {
       const v = e.target.value;
@@ -2929,11 +3099,11 @@ function renderGoldenBellPage() {
           : `<div class="gb-answer-card reveal">
                <p class="gb-answer-label">정답</p>
                ${isMultiple
-                 ? `<p class="gb-answer-text">${esc(q.correctChoice)}번 &nbsp; <span style="font-size:18px;font-weight:600;">${esc((q.choices || [])[Number(q.correctChoice) - 1] || "")}</span></p>`
+                 ? `<p class="gb-answer-text">${esc(q.correctChoice)}번 &nbsp; <span style="font-size:.7em;font-weight:700;margin-left:.3em;">${esc((q.choices || [])[Number(q.correctChoice) - 1] || "")}</span></p>`
                  : `<p class="gb-answer-text">${esc(q.answer)}</p>`}
-               ${q.page ? `<p style="margin:10px 0 0;font-size:14px;font-weight:700;opacity:.8;">📖 ${esc(pageText(q))}</p>` : ""}
+               ${q.page ? `<p style="margin:.4em 0 0;font-size:.8em;font-weight:700;opacity:.8;">${esc(pageText(q))}</p>` : ""}
              </div>`}
-        <div class="gb-author">${authorLine ? `출제자: <b>${esc(authorLine)}</b>` : "🙈 출제자는 정답 공개 후 표시됩니다"}</div>
+        <div class="gb-author">${authorLine ? `출제자: <b>${esc(authorLine)}</b>` : "출제자는 정답 공개 후 표시됩니다"}</div>
       </div>`;
     const revealBtn = document.getElementById("reveal-btn");
     if (revealBtn) revealBtn.onclick = () => { revealed = true; paintQuestionArea(); };
@@ -2961,21 +3131,21 @@ function renderGoldenBellPage() {
 
     app.innerHTML = `
       <div class="gb-summary">
-        <div class="fade-in" style="max-width:680px;width:100%;">
-          <div style="font-size:48px;margin-bottom:12px;">🏆</div>
-          <h1 style="font-family:var(--font-display);font-size:clamp(24px,4vw,32px);margin-bottom:26px;">골든벨이 종료되었습니다!</h1>
+        <div class="fade-in" style="max-width:min(1100px, 92vw);width:100%;">
+          <div class="gate-bell gb-summary-bell">${BELL_SVG}</div>
+          <h1 style="font-family:var(--font-display);font-size:2em;margin-bottom:1em;">골든벨이 종료되었습니다!</h1>
           <div class="gb-summary-grid">
-            <div class="gb-summary-box"><p style="color:rgba(255,255,255,.5);font-size:13px;margin:0;">총 문제 수</p><p style="font-size:24px;font-weight:800;margin:4px 0 0;">${qs.length}</p></div>
-            <div class="gb-summary-box"><p style="color:rgba(255,255,255,.5);font-size:13px;margin:0;">출제 학생 수</p><p style="font-size:24px;font-weight:800;margin:4px 0 0;">${students.length}</p></div>
-            ${quizData.participants ? `<div class="gb-summary-box" style="grid-column:1 / -1;text-align:center;background:linear-gradient(135deg,rgba(232,185,35,.25),rgba(184,134,11,.2));"><p style="color:rgba(255,255,255,.7);font-size:13px;margin:0;">🏆 끝까지 남은 학생</p><p style="font-size:30px;font-weight:800;margin:4px 0 0;color:var(--gold);">${quizData.survivors ?? quizData.participants}명 <span style="font-size:15px;color:rgba(255,255,255,.55);">/ ${quizData.participants}명</span></p></div>` : ""}
+            <div class="gb-summary-box"><p style="color:var(--gb-muted);font-size:.8em;margin:0;">총 문제 수</p><p style="font-size:1.6em;font-weight:800;margin:4px 0 0;">${qs.length}</p></div>
+            <div class="gb-summary-box"><p style="color:var(--gb-muted);font-size:.8em;margin:0;">출제 학생 수</p><p style="font-size:1.6em;font-weight:800;margin:4px 0 0;">${students.length}</p></div>
+            ${quizData.participants ? `<div class="gb-summary-box" style="grid-column:1 / -1;text-align:center;border:2px solid var(--gold);background:transparent;"><p style="color:var(--gb-muted);font-size:.8em;margin:0;">끝까지 남은 학생</p><p style="font-size:2.2em;font-weight:800;margin:4px 0 0;color:var(--gold);">${quizData.survivors ?? quizData.participants}명 <span style="font-size:.9em;color:var(--gb-muted);">/ ${quizData.participants}명</span></p></div>` : ""}
           </div>
           <div class="gb-summary-detail">
-            <div class="gb-summary-box"><p style="font-weight:700;font-size:13px;margin:0 0 8px;color:#ddd;">사용한 과목</p><p style="font-size:13px;color:rgba(255,255,255,.6);margin:0;">${esc(subjectsUsed.join(", "))}</p></div>
-            <div class="gb-summary-box"><p style="font-weight:700;font-size:13px;margin:0 0 8px;color:#ddd;">출제 학생 목록</p><p style="font-size:13px;color:rgba(255,255,255,.6);margin:0;max-height:96px;overflow-y:auto;">${esc(students.map(studentLabel).join(", "))}</p></div>
-            <div class="gb-summary-box"><p style="font-weight:700;font-size:13px;margin:0 0 8px;color:#ddd;">반별 출제 수</p>${byClass.map((d) => `<p style="font-size:13px;color:rgba(255,255,255,.6);margin:0;">${esc(d.label)}: ${d.value}문제</p>`).join("")}</div>
-            <div class="gb-summary-box"><p style="font-weight:700;font-size:13px;margin:0 0 8px;color:#ddd;">과목별 출제 수</p>${bySubject.map((d) => `<p style="font-size:13px;color:rgba(255,255,255,.6);margin:0;">${esc(d.label)}: ${d.value}문제</p>`).join("")}</div>
+            <div class="gb-summary-box"><p style="font-weight:700;font-size:.8em;margin:0 0 .4em;color:var(--gb-strong);">사용한 과목</p><p style="font-size:.8em;color:var(--gb-muted);margin:0;">${esc(subjectsUsed.join(", "))}</p></div>
+            <div class="gb-summary-box"><p style="font-weight:700;font-size:.8em;margin:0 0 .4em;color:var(--gb-strong);">출제 학생 목록</p><p style="font-size:.8em;color:var(--gb-muted);margin:0;max-height:96px;overflow-y:auto;">${esc(students.map(studentLabel).join(", "))}</p></div>
+            <div class="gb-summary-box"><p style="font-weight:700;font-size:.8em;margin:0 0 .4em;color:var(--gb-strong);">반별 출제 수</p>${byClass.map((d) => `<p style="font-size:.8em;color:var(--gb-muted);margin:0;">${esc(d.label)}: ${d.value}문제</p>`).join("")}</div>
+            <div class="gb-summary-box"><p style="font-weight:700;font-size:.8em;margin:0 0 .4em;color:var(--gb-strong);">과목별 출제 수</p>${bySubject.map((d) => `<p style="font-size:.8em;color:var(--gb-muted);margin:0;">${esc(d.label)}: ${d.value}문제</p>`).join("")}</div>
           </div>
-          <button class="btn btn-gold" id="back-to-admin-btn" style="margin-top:28px;padding:15px 30px;">관리자 화면으로 돌아가기</button>
+          <button class="btn btn-gold" id="back-to-admin-btn" style="margin-top:28px;padding:.7em 1.6em;">관리자 화면으로 돌아가기</button>
         </div>
       </div>`;
     document.getElementById("back-to-admin-btn").onclick = () => { sessionStorage.removeItem(ACTIVE_QUIZ_KEY); location.hash = "/admin"; };
@@ -2984,6 +3154,11 @@ function renderGoldenBellPage() {
   resetTimerForCurrentQuestion();
   paintAll();
 }
+
+/* ---------------- 시작 ----------------
+   모든 상수·함수가 준비된 뒤(스크립트 맨 끝)에서 첫 화면을 그림 */
+if (document.readyState === "loading") window.addEventListener("DOMContentLoaded", render);
+else render();
 </script>
 </body>
 </html>
