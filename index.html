@@ -195,7 +195,8 @@
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, addDoc, serverTimestamp, doc, updateDoc,
-  deleteDoc, setDoc, getDoc, query, where, orderBy, onSnapshot, getDocs, writeBatch
+  deleteDoc, setDoc, getDoc, query, where, orderBy, onSnapshot, getDocs, writeBatch,
+  Timestamp, deleteField
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
@@ -314,6 +315,7 @@ const COLLECTIONS = {
   PRACTICE_SETS: "practiceSets", // 연습 모드용으로 선생님이 공개한 문제 묶음 (학생이 읽음)
   SUBMIT_COUNTS: "submitCounts", // 학생별 제출 횟수 (1인당 최대 문제 수 제한용)
   ADMIN_UIDS: "adminUids",       // 로그인 계정(uid) → 아이디 연결 (구글 로그인용)
+  LINK_INVITES: "linkInvites",   // 다른 구글 계정을 같은 아이디에 합류시키는 1회용 연결 코드
 };
 // 학생 한 명을 구분하는 키 (반·번호·이름). 문서 ID에 '/'가 들어가지 않도록 인코딩
 function submitCountKey(ownerId, info) {
@@ -1317,7 +1319,7 @@ const googleButtonHTML = (label) => `
 // 구글로 처음 들어온 선생님: 학생 주소·참여 코드에 쓰일 아이디와 가입 코드를 한 번만 정함
 function renderGoogleSetup() {
   const user = auth.currentUser;
-  let submitting = false, errMsg = "", idVal = "", codeVal = "";
+  let submitting = false, errMsg = "", idVal = "", codeVal = "", inviteVal = "", joinErr = "";
   function paint() {
     app.innerHTML = `
       <div class="center-screen">
@@ -1330,11 +1332,45 @@ function renderGoogleSetup() {
             ${errMsg ? `<p class="error-box">${esc(errMsg)}</p>` : ""}
             <button type="submit" class="btn btn-gold" ${submitting ? "disabled" : ""}>${submitting ? "처리 중..." : "시작하기"}</button>
           </form>
-          <p style="font-size:11px;color:var(--ink-soft);margin:0;line-height:1.5;">이미 아이디/비밀번호로 만든 계정이 있다면, 아래 '다른 계정으로 로그인'을 눌러 그 계정으로 로그인한 뒤 위쪽의 '구글 계정 연결'을 눌러 주세요.</p>
+          <div style="border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:10px;">
+            <p style="font-size:13px;font-weight:800;margin:0;">이미 있는 아이디에 합류하기</p>
+            <p style="font-size:11px;color:var(--ink-soft);margin:0;line-height:1.5;">그 아이디로 로그인한 화면의 '👥 계정 관리'에서 연결 코드를 만들어 여기에 넣으면, 이 구글 계정으로도 같은 아이디를 관리할 수 있어요.</p>
+            <form id="gs-join-form" style="display:flex;gap:8px;">
+              <input class="input" id="gs-invite" value="${esc(inviteVal)}" placeholder="연결 코드 8자리" maxlength="10" autocomplete="off" style="flex:1;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">
+              <button type="submit" class="btn btn-dark" style="white-space:nowrap;padding:12px 14px;" ${submitting ? "disabled" : ""}>합류하기</button>
+            </form>
+            ${joinErr ? `<p class="error-box">${esc(joinErr)}</p>` : ""}
+          </div>
           <button type="button" class="btn btn-ghost" id="gs-out" style="font-size:13px;">다른 계정으로 로그인</button>
         </div>
       </div>`;
     document.getElementById("gs-out").onclick = () => signOut(auth);
+    document.getElementById("gs-join-form").onsubmit = async (e) => {
+      e.preventDefault();
+      if (submitting) return;
+      inviteVal = document.getElementById("gs-invite").value.replace(/\s/g, "").toUpperCase();
+      if (!inviteVal) { joinErr = "연결 코드를 입력해주세요."; return paint(); }
+      submitting = true; joinErr = ""; paint();
+      try {
+        const inv = await getDoc(doc(db, COLLECTIONS.LINK_INVITES, inviteVal));
+        const data = inv.exists() ? inv.data() : null;
+        if (!data || !data.ownerId) { submitting = false; joinErr = "연결 코드를 찾을 수 없어요."; return paint(); }
+        if (data.expiresAt?.toMillis && data.expiresAt.toMillis() < Date.now()) { submitting = false; joinErr = "기간이 지난 연결 코드예요. 새로 만들어 주세요."; return paint(); }
+        const batch = writeBatch(db);
+        batch.update(doc(db, COLLECTIONS.ADMINS, data.ownerId), { [`members.${user.uid}`]: user.email || "구글 계정", lastInviteCode: inviteVal });
+        batch.set(doc(db, COLLECTIONS.ADMIN_UIDS, user.uid), { ownerId: data.ownerId });
+        batch.delete(doc(db, COLLECTIONS.LINK_INVITES, inviteVal));
+        await batch.commit();
+        currentOwner = data.ownerId;
+        sessionStorage.removeItem(ADMIN_USER_KEY);
+        render();
+      } catch (err) {
+        console.error(err);
+        submitting = false;
+        joinErr = err.code === "permission-denied" ? "합류할 수 없어요. 코드가 맞는지, 기간이 지나지 않았는지 확인해주세요." : authErrorMessage(err);
+        paint();
+      }
+    };
     document.getElementById("gs-form").onsubmit = async (e) => {
       e.preventDefault();
       if (submitting) return;
@@ -1533,8 +1569,6 @@ function renderAuthGate() {
 
 function renderAdminDashboard(ownerId) {
   const providers = (auth.currentUser?.providerData || []).map((p) => p.providerId);
-  const hasGoogle = providers.includes("google.com");
-  const googleEmail = (auth.currentUser?.providerData || []).find((p) => p.providerId === "google.com")?.email || "";
   const hasPassword = providers.includes("password");
   let questions = [];
   let loading = true;
@@ -1561,9 +1595,7 @@ function renderAdminDashboard(ownerId) {
         <div class="btn-group" style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:13px;color:var(--ink-soft);font-weight:600;">${esc(sessionStorage.getItem(ADMIN_USER_KEY) || ownerId)}님</span>
           <button type="button" id="go-draw-btn" class="btn btn-gold" style="padding:10px 14px;font-size:13px;">골든벨 시작하기</button>
-          ${hasGoogle
-            ? `<span title="${esc(googleEmail)}" style="font-size:12px;font-weight:700;color:var(--green);background:var(--green-soft);border-radius:99px;padding:7px 12px;white-space:nowrap;">✓ 구글 연결됨</span>`
-            : `<button class="btn btn-ghost" id="link-google-btn" style="padding:10px 14px;font-size:13px;">구글 계정 연결</button>`}
+          <button class="btn btn-ghost" id="account-btn" style="padding:10px 14px;font-size:13px;">👥 계정 관리</button>
           ${hasPassword ? `<button class="btn btn-ghost" id="change-pw-btn" style="padding:10px 14px;font-size:13px;">비밀번호 변경</button>` : ""}
           <button class="btn btn-ghost" id="logout-btn" style="padding:10px 14px;font-size:13px;">로그아웃</button>
         </div>
@@ -1640,15 +1672,82 @@ function renderAdminDashboard(ownerId) {
     document.getElementById("draw-panel").scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const linkBtn = document.getElementById("link-google-btn");
-  if (linkBtn) linkBtn.onclick = async () => {
-    try {
-      await linkWithPopup(auth.currentUser, googleProvider);
-      ensureUidLink(auth.currentUser.uid, ownerId);
-      linkBtn.outerHTML = `<span style="font-size:12px;font-weight:700;color:var(--green);background:var(--green-soft);border-radius:99px;padding:7px 12px;white-space:nowrap;">✓ 구글 연결됨</span>`;
-      showNotice("구글 계정을 연결했어요. 다음부터는 'Google로 로그인'으로 들어올 수 있어요.");
-    } catch (e) { if (!GOOGLE_SILENT_CODES.includes(e.code)) { console.error(e); showNotice(authErrorMessage(e)); } }
-  };
+  /* ---- 계정 관리: 구글 연결 / 여러 구글 계정 함께 쓰기 ---- */
+  document.getElementById("account-btn").onclick = () => openAccountModal();
+  async function openAccountModal(note = "") {
+    const user = auth.currentUser;
+    const body = openModal("계정 관리", `<div class="center-screen" style="min-height:120px;"><div class="spinner spin"></div></div>`);
+    let adminData = {};
+    try { const snap = await getDoc(doc(db, COLLECTIONS.ADMINS, ownerId)); adminData = snap.exists() ? snap.data() : {}; }
+    catch (e) { console.error(e); }
+    if (!document.getElementById("modal-body")) return;
+    const members = adminData.members && typeof adminData.members === "object" ? adminData.members : {};
+    const myProviders = (user.providerData || []).map((p) => p.providerId);
+    const myGoogle = (user.providerData || []).find((p) => p.providerId === "google.com");
+    const isMain = adminData.uid === user.uid;
+    const myLabel = myGoogle ? `구글 ${myGoogle.email || ""}` : myProviders.includes("password") ? "아이디/비밀번호" : (user.email || "");
+    body.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        ${note ? `<p style="margin:0;font-size:13px;font-weight:700;color:var(--green);background:var(--green-soft);border-radius:12px;padding:10px 12px;">${esc(note)}</p>` : ""}
+        <div>
+          <p style="font-size:13px;font-weight:800;margin:0 0 8px;">지금 로그인한 계정</p>
+          <div style="background:var(--cream);border-radius:12px;padding:12px 14px;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span><b>${esc(myLabel)}</b> ${isMain ? `<span style="color:var(--ink-soft);">(처음 만든 계정)</span>` : ""}</span>
+            ${myGoogle ? `<span style="color:var(--green);font-weight:700;">✓ 구글 연결됨</span>`
+              : `<button class="btn btn-ghost" id="acc-link-google" style="padding:8px 12px;font-size:12px;">이 계정에 구글 연결</button>`}
+          </div>
+        </div>
+        <div>
+          <p style="font-size:13px;font-weight:800;margin:0 0 4px;">이 아이디를 함께 쓰는 구글 계정</p>
+          <p style="font-size:11px;color:var(--ink-soft);margin:0 0 8px;">연결된 계정은 모두 같은 문제·설정·학생 주소를 관리할 수 있어요. (예: 학교 계정과 개인 계정)</p>
+          ${Object.keys(members).length ? `<div style="display:flex;flex-direction:column;gap:6px;">${Object.entries(members).map(([uid, email]) => `
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:9px 12px;font-size:13px;">
+              <span>${esc(email || "구글 계정")}${uid === user.uid ? ` <span style="color:var(--ink-soft);">(지금 로그인)</span>` : ""}</span>
+              ${uid === user.uid ? "" : `<button class="btn btn-red" data-unlink="${esc(uid)}" style="padding:6px 10px;font-size:11px;">연결 해제</button>`}
+            </div>`).join("")}</div>`
+            : `<p style="font-size:12px;color:var(--ink-soft);margin:0;">아직 함께 쓰는 구글 계정이 없어요.</p>`}
+        </div>
+        <div style="border-top:1px solid var(--line);padding-top:14px;">
+          <p style="font-size:13px;font-weight:800;margin:0 0 4px;">다른 구글 계정 추가하기</p>
+          <p style="font-size:11px;color:var(--ink-soft);margin:0 0 10px;line-height:1.6;">① 아래에서 연결 코드를 만들어요 (30분 동안 한 번 쓸 수 있어요).<br>② 추가할 구글 계정으로 관리자 화면에서 'Google로 로그인'을 해요.<br>③ "구글 계정으로 처음 오셨네요" 화면 아래 '이미 있는 아이디에 합류하기'에 코드를 넣어요.</p>
+          <div id="acc-invite-box"></div>
+          <button class="btn btn-gold" id="acc-make-invite" style="width:100%;padding:11px;font-size:13px;">연결 코드 만들기</button>
+        </div>
+      </div>`;
+
+    const linkBtn = body.querySelector("#acc-link-google");
+    if (linkBtn) linkBtn.onclick = async () => {
+      try {
+        await linkWithPopup(auth.currentUser, googleProvider);
+        ensureUidLink(auth.currentUser.uid, ownerId);
+        openAccountModal("구글 계정을 연결했어요. 다음부터는 'Google로 로그인'으로 들어올 수 있어요.");
+      } catch (e) { if (!GOOGLE_SILENT_CODES.includes(e.code)) { console.error(e); showNotice(authErrorMessage(e)); } }
+    };
+    body.querySelector("#acc-make-invite").onclick = async () => {
+      const code = generateJoinCode(8);
+      const expires = new Date(Date.now() + 30 * 60 * 1000);
+      try {
+        await setDoc(doc(db, COLLECTIONS.LINK_INVITES, code), { ownerId, createdAt: serverTimestamp(), expiresAt: Timestamp.fromDate(expires) });
+        body.querySelector("#acc-invite-box").innerHTML = `
+          <div class="pop" style="text-align:center;background:var(--gold-soft);border-radius:14px;padding:14px;margin-bottom:10px;">
+            <p style="margin:0 0 4px;font-size:12px;color:var(--gold-deep);font-weight:700;">연결 코드</p>
+            <p style="margin:0;font-size:28px;font-weight:800;letter-spacing:.15em;color:var(--gold-deep);">${code}</p>
+            <p style="margin:6px 0 0;font-size:11px;color:var(--ink-soft);">${expires.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}까지 쓸 수 있어요</p>
+          </div>`;
+      } catch (e) { console.error(e); showNotice("연결 코드를 만들지 못했어요."); }
+    };
+    body.querySelectorAll("[data-unlink]").forEach((b) => b.onclick = async () => {
+      const uid = b.dataset.unlink;
+      if (!window.confirm(`${members[uid] || "이 계정"}의 연결을 해제할까요?\n해제하면 그 구글 계정으로는 이 아이디를 관리할 수 없어요.`)) return;
+      try {
+        const batch = writeBatch(db);
+        batch.update(doc(db, COLLECTIONS.ADMINS, ownerId), { [`members.${uid}`]: deleteField() });
+        batch.delete(doc(db, COLLECTIONS.ADMIN_UIDS, uid));
+        await batch.commit();
+        openAccountModal("연결을 해제했어요.");
+      } catch (e) { console.error(e); showNotice("연결 해제 중 오류가 발생했습니다."); }
+    });
+  }
   const pwBtn = document.getElementById("change-pw-btn");
   if (pwBtn) pwBtn.onclick = () => {
     const body = openModal("비밀번호 변경", `
@@ -2061,17 +2160,20 @@ function renderAdminDashboard(ownerId) {
     publishedHash = hash;
   }
   // 연습 모드가 켜져 있으면 문제 목록이 바뀔 때 공개 묶음도 맞춰 줌 (잠깐 모았다가 한 번에)
+  async function flushPracticeSync() {
+    syncTimer = null;
+    if (!practiceOpen) return;
+    const hash = hashString(JSON.stringify(practiceItemsFor(practiceScope)));
+    if (hash === publishedHash) return;
+    try { await publishPracticeSet(true); } catch (err) { console.error("연습 문제 반영 실패:", err); if (err.message === "too-large") showNotice("연습 문제가 너무 많아 반영하지 못했어요. 범위를 줄여주세요."); }
+  }
   function schedulePracticeSync() {
     if (!practiceOpen || loading) return;
     clearTimeout(syncTimer);
-    syncTimer = setTimeout(async () => {
-      if (!practiceOpen) return;
-      const hash = hashString(JSON.stringify(practiceItemsFor(practiceScope)));
-      if (hash === publishedHash) return;
-      try { await publishPracticeSet(true); } catch (err) { console.error("연습 문제 반영 실패:", err); if (err.message === "too-large") showNotice("연습 문제가 너무 많아 반영하지 못했어요. 범위를 줄여주세요."); }
-    }, 1500);
+    syncTimer = setTimeout(flushPracticeSync, 1500);
   }
-  registerCleanup(() => clearTimeout(syncTimer));
+  // 관리자 화면을 떠날 때 기다리던 반영이 있으면 바로 보냄
+  registerCleanup(() => { if (syncTimer) { clearTimeout(syncTimer); flushPracticeSync(); } });
 
 
   /* ---- 랜덤 추첨 패널 ---- */
