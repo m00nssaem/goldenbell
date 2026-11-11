@@ -200,6 +200,7 @@ import {
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
   signOut, setPersistence, browserSessionPersistence,
+  GoogleAuthProvider, signInWithPopup, linkWithPopup,
   EmailAuthProvider, reauthenticateWithCredential, updatePassword
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
@@ -312,6 +313,7 @@ const COLLECTIONS = {
   SETTINGS: "settings", ADMINS: "admins", JOIN_CODES: "joinCodes", SIGNUP_CLAIMS: "signupClaims",
   PRACTICE_SETS: "practiceSets", // 연습 모드용으로 선생님이 공개한 문제 묶음 (학생이 읽음)
   SUBMIT_COUNTS: "submitCounts", // 학생별 제출 횟수 (1인당 최대 문제 수 제한용)
+  ADMIN_UIDS: "adminUids",       // 로그인 계정(uid) → 아이디 연결 (구글 로그인용)
 };
 // 학생 한 명을 구분하는 키 (반·번호·이름). 문서 ID에 '/'가 들어가지 않도록 인코딩
 function submitCountKey(ownerId, info) {
@@ -576,12 +578,32 @@ function ownerIdFromUser(user) {
   return email.endsWith("@" + ADMIN_EMAIL_DOMAIN) ? email.slice(0, -(ADMIN_EMAIL_DOMAIN.length + 1)) : null;
 }
 let authReady = false;
-let authBusy = false; // 가입·계정 옮기기 도중에는 화면을 다시 그리지 않음
-let shownOwner;       // 관리자 화면에 지금 그려져 있는 계정 (로그인 화면이면 null)
-onAuthStateChanged(auth, (user) => {
+let authBusy = false;   // 가입·계정 옮기기 도중에는 화면을 다시 그리지 않음
+let currentOwner = null; // 로그인한 계정의 아이디 (구글 계정인데 아이디를 아직 안 정했으면 null)
+let shownState;          // 관리자 화면에 지금 그려져 있는 상태
+const adminState = () => auth.currentUser ? (currentOwner || "__setup__") : null;
+
+// 로그인 계정 → 아이디 찾기: adminUids 연결 문서, 없으면 "아이디@goldenbell.app" 이메일에서
+async function resolveOwner(user) {
+  if (!user) return null;
+  try {
+    const snap = await getDoc(doc(db, COLLECTIONS.ADMIN_UIDS, user.uid));
+    if (snap.exists() && snap.data().ownerId) return snap.data().ownerId;
+  } catch (e) { console.warn("계정 연결 정보 확인 실패:", e); }
+  const fromEmail = ownerIdFromUser(user);
+  if (fromEmail) ensureUidLink(user.uid, fromEmail);
+  return fromEmail;
+}
+// 아이디/비밀번호 계정도 uid 연결 문서를 만들어 두면, 나중에 구글 계정을 연결해도 같은 아이디로 들어옴
+function ensureUidLink(uid, ownerId) {
+  setDoc(doc(db, COLLECTIONS.ADMIN_UIDS, uid), { ownerId }).catch(() => {});
+}
+onAuthStateChanged(auth, async (user) => {
+  if (authBusy) return;
+  currentOwner = await resolveOwner(user);
   authReady = true;
-  // 로그인한 선생님이 실제로 바뀌었을 때만 다시 그림 (오류 문구가 지워지지 않도록)
-  if (!authBusy && getRoute().route === "admin" && ownerIdFromUser(user) !== shownOwner) render();
+  // 로그인 상태가 실제로 바뀌었을 때만 다시 그림 (오류 문구가 지워지지 않도록)
+  if (!authBusy && getRoute().route === "admin" && adminState() !== shownState) render();
 });
 if (document.readyState === "loading") window.addEventListener("DOMContentLoaded", render);
 else render();
@@ -1260,11 +1282,88 @@ function renderPracticePage(ownerId) {
    관리자 화면
    ========================================================================= */
 function renderAdminPage() {
-  if (!authReady) { shownOwner = undefined; app.innerHTML = `<div class="center-screen"><div class="spinner spin"></div></div>`; return; }
-  const ownerId = ownerIdFromUser(auth.currentUser);
-  shownOwner = ownerId;
-  if (!ownerId) { renderAuthGate(); return; }
-  renderAdminDashboard(ownerId);
+  if (!authReady) { shownState = undefined; app.innerHTML = `<div class="center-screen"><div class="spinner spin"></div></div>`; return; }
+  shownState = adminState();
+  if (!auth.currentUser) { renderAuthGate(); return; }
+  if (!currentOwner) { renderGoogleSetup(); return; }
+  renderAdminDashboard(currentOwner);
+}
+
+/* ---- 구글 로그인 ---- */
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: "select_account" });
+const GOOGLE_SILENT_CODES = ["auth/popup-closed-by-user", "auth/cancelled-popup-request"];
+async function startGoogleLogin(showErr) {
+  await persistenceReady;
+  authBusy = true;
+  try {
+    const cred = await signInWithPopup(auth, googleProvider);
+    currentOwner = await resolveOwner(cred.user);
+  } catch (e) {
+    authBusy = false;
+    if (!GOOGLE_SILENT_CODES.includes(e.code)) { console.error(e); showErr(authErrorMessage(e)); }
+    return;
+  }
+  authBusy = false;
+  if (currentOwner) sessionStorage.removeItem(ADMIN_USER_KEY);
+  render();
+}
+const googleButtonHTML = (label) => `
+  <button type="button" class="btn" id="google-btn" style="width:100%;background:#fff;border:2px solid var(--line);color:var(--ink);display:flex;align-items:center;justify-content:center;gap:10px;">
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-2.9-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.2 0-11.5-4.1-13.4-9.7l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>
+    ${label}
+  </button>`;
+
+// 구글로 처음 들어온 선생님: 학생 주소·참여 코드에 쓰일 아이디와 가입 코드를 한 번만 정함
+function renderGoogleSetup() {
+  const user = auth.currentUser;
+  let submitting = false, errMsg = "", idVal = "", codeVal = "";
+  function paint() {
+    app.innerHTML = `
+      <div class="center-screen">
+        <div class="card fade-in" style="width:100%;max-width:360px;display:flex;flex-direction:column;gap:14px;">
+          <h1 style="font-size:18px;font-weight:800;text-align:center;">구글 계정으로 처음 오셨네요</h1>
+          <p style="font-size:13px;color:var(--ink-soft);margin:0;text-align:center;line-height:1.5;"><b style="color:var(--ink);">${esc(user.email || "구글 계정")}</b><br>학생 접속 주소에 쓰일 아이디와 가입 코드를 정해 주세요. (한 번만 하면 돼요)</p>
+          <form id="gs-form" style="display:flex;flex-direction:column;gap:12px;">
+            <div><label class="label" style="font-size:13px;">아이디 (영문+숫자 4~20자)</label><input class="input" id="gs-id" value="${esc(idVal)}" autocomplete="off"></div>
+            <div><label class="label" style="font-size:13px;">가입 코드</label><input class="input" id="gs-code" value="${esc(codeVal)}" placeholder="관리 선생님께 받은 가입 코드" autocomplete="off"></div>
+            ${errMsg ? `<p class="error-box">${esc(errMsg)}</p>` : ""}
+            <button type="submit" class="btn btn-gold" ${submitting ? "disabled" : ""}>${submitting ? "처리 중..." : "시작하기"}</button>
+          </form>
+          <p style="font-size:11px;color:var(--ink-soft);margin:0;line-height:1.5;">이미 아이디/비밀번호로 만든 계정이 있다면, 아래 '다른 계정으로 로그인'을 눌러 그 계정으로 로그인한 뒤 위쪽의 '구글 계정 연결'을 눌러 주세요.</p>
+          <button type="button" class="btn btn-ghost" id="gs-out" style="font-size:13px;">다른 계정으로 로그인</button>
+        </div>
+      </div>`;
+    document.getElementById("gs-out").onclick = () => signOut(auth);
+    document.getElementById("gs-form").onsubmit = async (e) => {
+      e.preventDefault();
+      if (submitting) return;
+      idVal = document.getElementById("gs-id").value.trim();
+      codeVal = document.getElementById("gs-code").value.trim();
+      if (!ID_PATTERN.test(idVal) || idVal.length < 4 || idVal.length > 20) { errMsg = "아이디는 영문과 숫자만 사용해 4~20자로 입력해주세요."; return paint(); }
+      if (!codeVal) { errMsg = "가입 코드를 입력해주세요."; return paint(); }
+      const idKey = idVal.toLowerCase();
+      const ref = doc(db, COLLECTIONS.ADMINS, idKey);
+      submitting = true; errMsg = ""; paint();
+      try {
+        if (await adminIdTaken(ref)) { submitting = false; errMsg = "이미 사용 중인 아이디입니다."; return paint(); }
+        const batch = writeBatch(db);
+        batch.set(doc(db, COLLECTIONS.SIGNUP_CLAIMS, idKey), { code: codeVal, uid: user.uid });
+        batch.set(ref, { id: idVal, uid: user.uid, createdAt: serverTimestamp() });
+        batch.set(doc(db, COLLECTIONS.ADMIN_UIDS, user.uid), { ownerId: idKey });
+        await batch.commit();
+        currentOwner = idKey;
+        sessionStorage.setItem(ADMIN_USER_KEY, idVal);
+        render();
+      } catch (err) {
+        console.error(err);
+        submitting = false;
+        errMsg = err.code === "permission-denied" ? "가입 코드가 올바르지 않습니다." : authErrorMessage(err);
+        paint();
+      }
+    };
+  }
+  paint();
 }
 
 // 다른 선생님 계정 문서는 읽을 수 없게 막혀 있으므로, '읽기 거부' = 이미 있는 아이디
@@ -1275,7 +1374,11 @@ async function adminIdTaken(ref) {
 const WRONG_PW_CODES = ["auth/invalid-credential", "auth/wrong-password", "auth/user-not-found", "auth/invalid-login-credentials"];
 function authErrorMessage(err) {
   switch (err && err.code) {
-    case "auth/operation-not-allowed": return "Firebase 콘솔에서 '이메일/비밀번호' 로그인을 켜야 합니다. (Authentication → 로그인 방법)";
+    case "auth/operation-not-allowed": return "Firebase 콘솔에서 이 로그인 방법(이메일/비밀번호 또는 Google)을 켜야 합니다. (Authentication → 로그인 방법)";
+    case "auth/unauthorized-domain": return "이 사이트 주소가 Firebase 승인된 도메인에 없어요. (Authentication → 설정 → 승인된 도메인에 추가)";
+    case "auth/popup-blocked": return "팝업이 차단됐어요. 브라우저에서 이 사이트의 팝업을 허용해 주세요.";
+    case "auth/credential-already-in-use": return "이 구글 계정은 이미 다른 골든벨 계정에 연결되어 있어요.";
+    case "auth/provider-already-linked": return "이미 구글 계정이 연결되어 있어요.";
     case "auth/too-many-requests": return "시도가 너무 많아요. 잠시 후 다시 시도해주세요.";
     case "auth/network-request-failed": return "인터넷 연결을 확인해주세요.";
     case "auth/weak-password": return "비밀번호는 6자 이상이어야 합니다.";
@@ -1321,6 +1424,8 @@ function renderAuthGate() {
               ${submitting ? "처리 중..." : mode === "login" ? "로그인" : "가입하고 시작하기"}
             </button>
           </form>
+          <div style="display:flex;align-items:center;gap:10px;color:var(--ink-soft);font-size:12px;"><div style="flex:1;height:1px;background:var(--line);"></div>또는<div style="flex:1;height:1px;background:var(--line);"></div></div>
+          ${googleButtonHTML(mode === "login" ? "Google로 로그인" : "Google로 가입하기")}
           ${mode === "login" ? `<p style="font-size:11px;color:var(--ink-soft);margin:0;line-height:1.5;">비밀번호를 잊었다면 이 사이트를 관리하는 선생님께 '계정 초기화'를 부탁하세요. 초기화한 뒤 같은 아이디로 다시 가입하면 그동안의 문제와 설정은 그대로 남아 있어요.</p>` : ""}
         </div>
       </div>`;
@@ -1335,6 +1440,7 @@ function renderAuthGate() {
 
     const idInput = document.getElementById("auth-id");
     if (lastId) idInput.value = lastId;
+    document.getElementById("google-btn").onclick = () => startGoogleLogin(showErr);
 
     document.getElementById("auth-form").onsubmit = async (e) => {
       e.preventDefault();
@@ -1380,6 +1486,7 @@ function renderAuthGate() {
             const batch = writeBatch(db);
             batch.set(doc(db, COLLECTIONS.SIGNUP_CLAIMS, idKey), { code: signupCode, uid: cred.user.uid });
             batch.set(ref, { id, uid: cred.user.uid, createdAt: serverTimestamp() });
+            batch.set(doc(db, COLLECTIONS.ADMIN_UIDS, cred.user.uid), { ownerId: idKey });
             await batch.commit();
           } catch (e) {
             // 코드가 틀리면 방금 만든 로그인 계정을 지워서 아이디가 묶이지 않게 함
@@ -1409,6 +1516,8 @@ function renderAuthGate() {
           try { const me = await getDoc(ref); if (me.exists() && me.data().id) displayId = me.data().id; } catch (e) {}
         }
         sessionStorage.setItem(ADMIN_USER_KEY, displayId);
+        currentOwner = idKey;
+        if (auth.currentUser) ensureUidLink(auth.currentUser.uid, idKey);
         authBusy = false;
         render();
       } catch (err) {
@@ -1423,6 +1532,9 @@ function renderAuthGate() {
 }
 
 function renderAdminDashboard(ownerId) {
+  const providers = (auth.currentUser?.providerData || []).map((p) => p.providerId);
+  const hasGoogle = providers.includes("google.com");
+  const hasPassword = providers.includes("password");
   let questions = [];
   let loading = true;
   let loadErr = null;
@@ -1448,7 +1560,8 @@ function renderAdminDashboard(ownerId) {
         <div class="btn-group" style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:13px;color:var(--ink-soft);font-weight:600;">${esc(sessionStorage.getItem(ADMIN_USER_KEY) || ownerId)}님</span>
           <button type="button" id="go-draw-btn" class="btn btn-gold" style="padding:10px 14px;font-size:13px;">골든벨 시작하기</button>
-          <button class="btn btn-ghost" id="change-pw-btn" style="padding:10px 14px;font-size:13px;">비밀번호 변경</button>
+          ${hasGoogle ? "" : `<button class="btn btn-ghost" id="link-google-btn" style="padding:10px 14px;font-size:13px;">구글 계정 연결</button>`}
+          ${hasPassword ? `<button class="btn btn-ghost" id="change-pw-btn" style="padding:10px 14px;font-size:13px;">비밀번호 변경</button>` : ""}
           <button class="btn btn-ghost" id="logout-btn" style="padding:10px 14px;font-size:13px;">로그아웃</button>
         </div>
       </div>
@@ -1524,7 +1637,17 @@ function renderAdminDashboard(ownerId) {
     document.getElementById("draw-panel").scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  document.getElementById("change-pw-btn").onclick = () => {
+  const linkBtn = document.getElementById("link-google-btn");
+  if (linkBtn) linkBtn.onclick = async () => {
+    try {
+      await linkWithPopup(auth.currentUser, googleProvider);
+      ensureUidLink(auth.currentUser.uid, ownerId);
+      linkBtn.remove();
+      showNotice("구글 계정을 연결했어요. 다음부터는 'Google로 로그인'으로 들어올 수 있어요.");
+    } catch (e) { if (!GOOGLE_SILENT_CODES.includes(e.code)) { console.error(e); showNotice(authErrorMessage(e)); } }
+  };
+  const pwBtn = document.getElementById("change-pw-btn");
+  if (pwBtn) pwBtn.onclick = () => {
     const body = openModal("비밀번호 변경", `
       <form id="pw-form" style="display:flex;flex-direction:column;gap:12px;">
         <div><label class="label" style="font-size:13px;">지금 비밀번호</label><input class="input" type="password" id="pw-cur" autocomplete="current-password"></div>
