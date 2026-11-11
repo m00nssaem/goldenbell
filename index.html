@@ -1534,6 +1534,7 @@ function renderAuthGate() {
 function renderAdminDashboard(ownerId) {
   const providers = (auth.currentUser?.providerData || []).map((p) => p.providerId);
   const hasGoogle = providers.includes("google.com");
+  const googleEmail = (auth.currentUser?.providerData || []).find((p) => p.providerId === "google.com")?.email || "";
   const hasPassword = providers.includes("password");
   let questions = [];
   let loading = true;
@@ -1560,7 +1561,9 @@ function renderAdminDashboard(ownerId) {
         <div class="btn-group" style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:13px;color:var(--ink-soft);font-weight:600;">${esc(sessionStorage.getItem(ADMIN_USER_KEY) || ownerId)}님</span>
           <button type="button" id="go-draw-btn" class="btn btn-gold" style="padding:10px 14px;font-size:13px;">골든벨 시작하기</button>
-          ${hasGoogle ? "" : `<button class="btn btn-ghost" id="link-google-btn" style="padding:10px 14px;font-size:13px;">구글 계정 연결</button>`}
+          ${hasGoogle
+            ? `<span title="${esc(googleEmail)}" style="font-size:12px;font-weight:700;color:var(--green);background:var(--green-soft);border-radius:99px;padding:7px 12px;white-space:nowrap;">✓ 구글 연결됨</span>`
+            : `<button class="btn btn-ghost" id="link-google-btn" style="padding:10px 14px;font-size:13px;">구글 계정 연결</button>`}
           ${hasPassword ? `<button class="btn btn-ghost" id="change-pw-btn" style="padding:10px 14px;font-size:13px;">비밀번호 변경</button>` : ""}
           <button class="btn btn-ghost" id="logout-btn" style="padding:10px 14px;font-size:13px;">로그아웃</button>
         </div>
@@ -1642,7 +1645,7 @@ function renderAdminDashboard(ownerId) {
     try {
       await linkWithPopup(auth.currentUser, googleProvider);
       ensureUidLink(auth.currentUser.uid, ownerId);
-      linkBtn.remove();
+      linkBtn.outerHTML = `<span style="font-size:12px;font-weight:700;color:var(--green);background:var(--green-soft);border-radius:99px;padding:7px 12px;white-space:nowrap;">✓ 구글 연결됨</span>`;
       showNotice("구글 계정을 연결했어요. 다음부터는 'Google로 로그인'으로 들어올 수 있어요.");
     } catch (e) { if (!GOOGLE_SILENT_CODES.includes(e.code)) { console.error(e); showNotice(authErrorMessage(e)); } }
   };
