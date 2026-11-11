@@ -1189,8 +1189,10 @@ function renderStudentPage(ownerId) {
    ========================================================================= */
 // 연습 문제로 공개할 범위: imported(가져온 연습 문제) | approved(승인된 우리 반 문제) | both
 const PRACTICE_SCOPES = { imported: "가져온 연습 문제만", both: "가져온 문제 + 승인된 우리 반 문제", approved: "승인된 우리 반 문제만" };
-function isPracticeQuestion(q, scope = "both") {
+// classes: 공개할 반 목록 (비어 있으면 모든 반). 반 필터는 우리 반 학생이 낸 문제에만 적용하고, 가져온 연습 문제는 그대로 포함
+function isPracticeQuestion(q, scope = "both", classes = []) {
   if (q.isDeleted) return false;
+  if (classes.length && !q.isImported && !classes.includes(q.class)) return false;
   if (scope === "imported") return !!q.isImported;
   if (scope === "approved") return !!q.isApproved;
   return !!(q.isApproved || q.isImported);
@@ -1764,6 +1766,7 @@ function renderAdminDashboard(ownerId) {
               <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
                 <div id="qr-canvas" style="padding:10px;background:#fff;border:1px solid var(--line);border-radius:14px;"></div>
                 <p id="qr-url" style="font-size:12px;color:var(--ink-soft);word-break:break-all;text-align:center;"></p>
+                <button class="btn btn-dark" id="big-qr-btn" style="width:100%;font-size:13px;padding:10px;">QR코드 크게 보기</button>
                 <div style="display:flex;gap:8px;width:100%;">
                   <button class="btn btn-ghost" id="copy-url-btn" style="flex:1;font-size:12px;padding:9px;">URL 복사</button>
                   <button class="btn btn-gold" id="dl-qr-btn" style="flex:1;font-size:12px;padding:9px;">QR 다운로드</button>
@@ -1826,6 +1829,20 @@ function renderAdminDashboard(ownerId) {
   try { new QRCode(document.getElementById("qr-canvas"), { text: studentUrl, width: 150, height: 150, correctLevel: QRCode.CorrectLevel.M }); } catch (e) {}
   document.getElementById("copy-url-btn").onclick = async () => {
     try { await navigator.clipboard.writeText(studentUrl); showNotice("URL을 복사했습니다."); } catch (e) {}
+  };
+  // 전자칠판·빔프로젝터로 띄워 학생들이 찍을 수 있도록 큰 QR을 팝업으로 보여줌
+  document.getElementById("big-qr-btn").onclick = () => {
+    const body = openModal("학생 접속 QR코드", `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px;">
+        <div id="qr-big" style="padding:16px;background:#fff;border:1px solid var(--line);border-radius:14px;"></div>
+        ${joinCode ? `<div style="text-align:center;"><p style="margin:0 0 2px;font-size:12px;color:var(--ink-soft);font-weight:700;">참여 코드</p><p style="margin:0;font-size:32px;font-weight:800;letter-spacing:.15em;color:var(--gold-deep);">${esc(joinCode)}</p></div>` : ""}
+        <p style="font-size:13px;color:var(--ink-soft);margin:0;text-align:center;">휴대폰 카메라로 찍으면 문제 내는 화면이 열립니다.</p>
+      </div>`);
+    const box = document.querySelector("#modal-back .modal-box");
+    if (box) box.style.maxWidth = "min(94vw, 760px)";
+    const z = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--z")) || 1;
+    const size = Math.max(220, Math.min(620, Math.floor(Math.min(window.innerWidth, window.innerHeight * 0.75) / z - 110)));
+    try { new QRCode(body.querySelector("#qr-big"), { text: studentUrl, width: size, height: size, correctLevel: QRCode.CorrectLevel.M }); } catch (e) {}
   };
   document.getElementById("dl-qr-btn").onclick = () => {
     const canvas = document.querySelector("#qr-canvas canvas");
@@ -2278,7 +2295,14 @@ function renderAdminDashboard(ownerId) {
       <select class="input" id="practice-scope-select" style="padding:9px;font-size:13px;margin-bottom:6px;">
         ${Object.entries(PRACTICE_SCOPES).map(([k, label]) => `<option value="${k}" ${practiceScope === k ? "selected" : ""}>${label}</option>`).join("")}
       </select>
-      ${practiceScope !== "imported" ? `<p style="font-size:12px;color:#7E5C0E;margin:0 0 8px;">승인된 문제를 공개하면 학생들이 골든벨 정답을 미리 볼 수 있습니다.</p>` : ""}
+      ${practiceScope !== "imported" ? `
+      <p style="font-size:12px;font-weight:700;margin:8px 0 6px;">공개할 반 <span style="font-weight:600;color:var(--ink-soft);">(여러 반 선택 가능)</span></p>
+      <div class="grid3" style="margin-bottom:6px;">
+        <button type="button" class="pill-btn ${practiceClasses.length === 0 ? "active" : ""}" data-pclass-all="1">모든 반</button>
+        ${CLASSES.map((c) => `<button type="button" class="pill-btn ${practiceClasses.includes(c) ? "active" : ""}" data-pclass="${esc(c)}">${esc(c)}</button>`).join("")}
+      </div>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px;">고른 반 학생이 낸 문제만 공개합니다. 가져온 연습 문제는 반과 관계없이 공개됩니다.</p>
+      <p style="font-size:12px;color:#7E5C0E;margin:0 0 8px;">승인된 문제를 공개하면 학생들이 골든벨 정답을 미리 볼 수 있습니다.</p>` : ""}
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <span style="font-weight:800;font-size:14px;color:${practiceOpen ? "var(--green)" : "var(--ink-soft)"};">${practiceOpen ? `켜짐, ${practiceCount}문제 공개 중` : `꺼짐 (공개할 문제 ${practiceCount}개)`}</span>
         <button class="btn ${practiceOpen ? "btn-ghost" : "btn-green"}" id="toggle-practice-btn" style="padding:9px 16px;font-size:12px;" ${toggling ? "disabled" : ""}>${practiceOpen ? "끄기" : "켜기"}</button>
@@ -2300,6 +2324,18 @@ function renderAdminDashboard(ownerId) {
         showNotice(`연습 문제 범위: ${PRACTICE_SCOPES[e.target.value]}`);
       } catch (err) { console.error(err); showNotice("설정 변경 중 오류가 발생했습니다."); }
     };
+    const savePracticeClasses = async (next) => {
+      try {
+        await setDoc(doc(db, COLLECTIONS.SETTINGS, ownerId), { practiceClasses: next }, { merge: true });
+        showNotice(next.length ? `연습 문제 공개 반: ${next.join(", ")}` : "연습 문제 공개 반: 모든 반");
+      } catch (err) { console.error(err); showNotice("설정 변경 중 오류가 발생했습니다."); }
+    };
+    document.querySelectorAll("[data-pclass]").forEach((b) => b.onclick = () => {
+      const c = b.dataset.pclass;
+      savePracticeClasses(practiceClasses.includes(c) ? practiceClasses.filter((x) => x !== c) : [...practiceClasses, c]);
+    });
+    const allBtn = document.querySelector("[data-pclass-all]");
+    if (allBtn) allBtn.onclick = () => savePracticeClasses([]);
     document.getElementById("max-per-student-select").onchange = async (e) => {
       try {
         await setDoc(doc(db, COLLECTIONS.SETTINGS, ownerId), { maxPerStudent: Number(e.target.value) }, { merge: true });
@@ -2330,9 +2366,10 @@ function renderAdminDashboard(ownerId) {
 
   /* ---- 연습 문제 공개 (practiceSets/{ownerId}) ---- */
   let practiceScope = "both";
+  let practiceClasses = [];      // 연습 문제로 공개할 반 (빈 목록 = 모든 반)
   let publishedHash = null;      // 지금 공개된 연습 문제 묶음의 해시
   let syncTimer = null;
-  function practiceItemsFor(scope) { return questions.filter((q) => isPracticeQuestion(q, scope)).map(toPracticeItem); }
+  function practiceItemsFor(scope) { return questions.filter((q) => isPracticeQuestion(q, scope, practiceClasses)).map(toPracticeItem); }
   async function publishPracticeSet(open) {
     const items = open ? practiceItemsFor(practiceScope) : [];
     const json = JSON.stringify(items);
@@ -2829,6 +2866,8 @@ function renderAdminDashboard(ownerId) {
       maxPerStudent = snap.exists() ? Math.max(0, Number(snap.data().maxPerStudent) || 0) : 0;
       const nextScope = snap.exists() && PRACTICE_SCOPES[snap.data().practiceScope] ? snap.data().practiceScope : "both";
       if (nextScope !== practiceScope) { practiceScope = nextScope; publishedHash = null; }
+      const rc = snap.exists() && Array.isArray(snap.data().practiceClasses) ? snap.data().practiceClasses : [];
+      if (JSON.stringify(rc) !== JSON.stringify(practiceClasses)) { practiceClasses = rc; publishedHash = null; }
       applyUnitSettings(snap.exists() ? snap.data() : null);
       schedulePracticeSync();
       renderUnitManager();
