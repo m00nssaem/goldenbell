@@ -942,10 +942,12 @@ function renderStudentPage(ownerId) {
               <span style="flex-shrink:0;font-weight:700;color:var(--gold-deep);">${items.length - i}.</span>
               <span style="flex-shrink:0;background:#fff;border-radius:99px;padding:1px 8px;font-size:12px;font-weight:700;color:var(--ink);">${esc(h.unit ? `${h.subject} ${h.unit}` : h.subject)}${h.page ? ` ${esc(h.page)}쪽` : ""}</span>
               <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${h.editedAt ? `<b style="color:var(--green);font-weight:700;">고침</b> ` : ""}${esc(h.preview)}</span>
-              ${canEdit(h) ? `<button type="button" class="hist-edit" data-edit-id="${esc(h.id)}">고치기</button>` : ""}
+              ${canEdit(h) ? `<button type="button" class="hist-edit" data-edit-id="${esc(h.id)}">고치기</button>`
+                : `<span style="flex-shrink:0;font-size:11px;color:#9AA39E;" title="고치기 기능이 생기기 전에 낸 문제예요">고칠 수 없음</span>`}
             </div>`).join("")}
         </div>
         ${editable ? `<p style="font-size:12px;color:var(--ink-soft);margin:8px 0 0;">문제를 고치면 선생님이 다시 확인한 뒤 골든벨에 나와요.</p>` : ""}
+        ${items.some((h) => !canEdit(h)) ? `<p style="font-size:12px;color:var(--ink-soft);margin:4px 0 0;">'고칠 수 없음'은 고치기 기능이 생기기 전에 낸 문제예요. 고치려면 선생님께 말씀드려요.</p>` : ""}
       </div>`;
   }
   function startEdit(id) {
