@@ -11,7 +11,6 @@
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" defer></script>
 <style>
   :root{
@@ -37,7 +36,8 @@
     --radius:12px;
     --radius-sm:8px;
     --font-body:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
-    --font-display:'Black Han Sans','Pretendard',sans-serif;
+    --font-display:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    --display-weight:700;   /* 제목·문제 글씨 굵기 */
     --shadow:none;
     --footer-h:44px;
   }
@@ -112,7 +112,7 @@
 
   /* ---------- student page ---------- */
   .student-wrap{ max-width:600px; margin:0 auto; padding:32px 16px 40px; }
-  .brand{ text-align:center; margin-bottom:4px; font-family:var(--font-display); font-size:30px; letter-spacing:.01em; color:var(--board); }
+  .brand{ text-align:center; margin-bottom:4px; font-family:var(--font-display); font-weight:800; font-size:28px; letter-spacing:-.01em; color:var(--board); }
   .bell{ width:1em; height:1em; vertical-align:-0.13em; margin-right:.28em; color:var(--gold); }
   .gate-bell{ text-align:center; font-size:46px; line-height:1; margin-bottom:10px; }
   .gate-bell .bell{ margin:0; }
@@ -135,9 +135,17 @@
   .ox-btn.active{ border-color:var(--green); background:var(--green-soft); color:var(--green); }
   .edit-banner{ display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--gold-soft); color:var(--gold-deep); border-radius:10px; padding:10px 12px; font-size:13px; font-weight:700; }
   .hist-edit{ flex-shrink:0; margin-left:auto; background:#fff; border:1px solid var(--line); border-radius:99px; padding:2px 10px; font-size:12px; font-weight:700; color:var(--board); }
+  .hist-item > summary{ list-style:none; cursor:pointer; }
+  .hist-item > summary::-webkit-details-marker{ display:none; }
+  .hist-item[open] .hist-caret{ transform:rotate(180deg); }
+  .hist-caret{ flex-shrink:0; font-size:10px; color:var(--ink-soft); transition:transform .15s; }
+  .hist-detail{ background:#fff; border-radius:10px; padding:10px 12px; margin:6px 0 4px; font-size:13px; color:var(--ink); line-height:1.55; text-align:left; }
+  .hist-detail .hd-label{ font-size:11px; font-weight:800; color:var(--gold-deep); margin:8px 0 2px; }
+  .hist-detail .hd-choice{ display:flex; gap:6px; padding:2px 0; }
+  .hist-detail .hd-choice.ok{ color:var(--green); font-weight:800; }
   .my-qs summary{ cursor:pointer; font-size:13px; font-weight:700; color:var(--ink-soft); }
   .p-ox{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .p-ox .p-choice{ justify-content:center; font-size:40px; font-family:var(--font-display); padding:18px; }
+  .p-ox .p-choice{ justify-content:center; font-size:36px; font-weight:800; font-family:var(--font-display); padding:18px; }
   .p-ox .choice-idx{ display:none; }
   .p-ox .pen-mark{ margin-left:8px; }
   .seg{ display:grid; grid-template-columns:repeat(3,1fr); gap:4px; background:#E3E9E1; border-radius:10px; padding:4px; }
@@ -150,7 +158,7 @@
   .choice-mark.active::after{ content:"✓"; font-size:12px; margin-left:1px; }
   .choice-row:has(.choice-mark.active) .choice-input{ border-color:var(--green); background:var(--green-soft); }
   .pen-mark{ margin-left:auto; color:var(--red); font-size:34px; font-weight:400; line-height:1; font-family:'Times New Roman',serif; }
-  .score-big{ font-family:var(--font-display); font-size:64px; line-height:1; color:var(--red); }
+  .score-big{ font-family:var(--font-display); font-weight:800; font-size:64px; line-height:1; color:var(--red); }
   .score-big small{ font-size:28px; color:var(--ink-soft); }
   .p-tag{ font-size:12px; font-weight:700; background:#E3E9E1; color:var(--board); border-radius:6px; padding:5px 11px; max-width:70%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .p-question{ font-size:20px; font-weight:800; line-height:1.55; white-space:pre-wrap; margin:4px 0; word-break:keep-all; }
@@ -163,7 +171,7 @@
   /* ---------- admin page ---------- */
   .admin-wrap{ max-width:1680px; margin:0 auto; padding:22px clamp(16px, 3vw, 48px) 60px; }
   .admin-head{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:16px; }
-  .admin-title{ font-family:var(--font-display); font-size:24px; display:flex; align-items:center; color:var(--board); }
+  .admin-title{ font-family:var(--font-display); font-weight:800; font-size:24px; display:flex; align-items:center; color:var(--board); }
   .live-dot{ display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--green); font-weight:700; }
   .live-dot span.d{ width:8px; height:8px; border-radius:99px; background:var(--green); animation:pulse 1.6s infinite; }
   @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
@@ -232,12 +240,12 @@
   .gb-settings-panel{ position:absolute; top:100%; right:1em; z-index:30; width:320px; font-size:15px; background:var(--gb-panel); border:1px solid var(--gb-line); border-radius:18px; box-shadow:0 10px 30px rgba(0,0,0,.4); padding:16px; }
   .gb-body{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2.5vh 3vw; text-align:center; min-height:52vh; }
   .gb-qnum{ color:var(--gold); font-weight:800; font-size:1.05em; margin-bottom:.4em; letter-spacing:.02em; }
-  .gb-question{ font-family:var(--font-display); font-size:clamp(28px, 2.9vw + 1.8vh, 130px); max-width:94vw; line-height:1.38; margin-bottom:.55em; white-space:pre-wrap; word-break:keep-all; }
+  .gb-question{ font-family:var(--font-display); font-weight:var(--display-weight); letter-spacing:-.01em; font-size:clamp(28px, 2.9vw + 1.8vh, 130px); max-width:94vw; line-height:1.38; margin-bottom:.55em; white-space:pre-wrap; word-break:keep-all; }
   .gb-choices{ display:grid; grid-template-columns:1fr; gap:.6em; width:100%; max-width:min(94vw, 2200px); margin-bottom:1.1em; }
   @media(min-width:640px){ .gb-choices{ grid-template-columns:1fr 1fr; } }
   .gb-choice{ padding:.65em .9em; border-radius:.4em; font-size:1.45em; font-weight:700; border:2px solid var(--gb-line); background:var(--gb-surface); display:flex; align-items:center; gap:12px; text-align:left; }
   .gb-choices.ox{ grid-template-columns:1fr 1fr; max-width:min(80vw, 1400px); }
-  .gb-choices.ox .gb-choice{ justify-content:center; font-family:var(--font-display); font-size:4em; padding:.15em; }
+  .gb-choices.ox .gb-choice{ justify-content:center; font-family:var(--font-display); font-weight:800; font-size:3.6em; padding:.15em; }
   .gb-choices.ox .gb-choice-idx{ display:none; }
   .gb-choice.correct{ background:var(--gold); border-color:var(--gold-soft); color:#2A2208; }
   .gb-choice-idx{ width:1.5em; height:1.5em; flex-shrink:0; border-radius:99px; background:var(--gb-surface2); display:flex; align-items:center; justify-content:center; font-size:.75em; }
@@ -930,21 +938,48 @@ function renderStudentPage(ownerId) {
     if (i >= 0) { list[i] = { ...list[i], ...patch }; saveJSON(historyKey, list); }
   }
   const canEdit = (h) => !!(h && h.id && h.token && h.data);
+  // 내가 낸 문제 하나의 전체 내용 (문제·보기·정답)
+  function historyDetailHTML(h) {
+    const d = h.data;
+    if (!d) return `<div class="hist-detail"><p style="margin:0;white-space:pre-wrap;">${esc(h.preview)}</p>
+      <p style="margin:6px 0 0;font-size:12px;color:var(--ink-soft);">이 문제는 예전 방식으로 낸 문제라 이 기기에 앞부분만 기록되어 있어요. 전체 문제와 정답은 선생님께 여쭤봐요.</p></div>`;
+    const corrects = correctList(d);
+    const isOX = d.type === QUESTION_TYPES.OX;
+    const auto = defaultAnswerFor(d.type, d.choices || [], corrects);
+    return `<div class="hist-detail">
+      <p style="margin:0;font-size:11px;color:var(--ink-soft);font-weight:700;">${esc(d.type)}</p>
+      <p style="margin:2px 0 0;font-weight:700;white-space:pre-wrap;">${esc(d.question)}</p>
+      ${d.type === QUESTION_TYPES.MULTIPLE ? `<p class="hd-label">보기</p>${(d.choices || []).map((c, i) => {
+          const ok = corrects.includes(String(i + 1));
+          return `<div class="hd-choice ${ok ? "ok" : ""}"><span>${i + 1}.</span><span style="flex:1;">${esc(c)}</span>${ok ? "<span>✓ 정답</span>" : ""}</div>`;
+        }).join("")}` : ""}
+      ${isOX ? `<p class="hd-label">정답</p><p style="margin:0;font-size:20px;font-weight:800;color:var(--green);">${esc(correctText(d))}</p>` : ""}
+      ${d.type === QUESTION_TYPES.ESSAY ? `<p class="hd-label">모범 답안</p><p style="margin:0;white-space:pre-wrap;">${esc(d.answer)}</p>
+        ${acceptedList(d).length ? `<p class="hd-label">이것도 정답</p><p style="margin:0;">${acceptedList(d).map(esc).join(", ")}</p>` : ""}`
+        : d.answer && d.answer !== auto ? `<p class="hd-label">정답 설명</p><p style="margin:0;white-space:pre-wrap;">${esc(d.answer)}</p>` : ""}
+    </div>`;
+  }
   function historyListHTML(items, { plain = false } = {}) {
     if (items.length === 0) return "";
     const editable = items.some(canEdit);
     return `
       <div style="${plain ? "margin-top:10px;" : "margin-top:14px;"}background:var(--cream);border-radius:14px;padding:14px 16px;text-align:left;">
-        ${plain ? "" : `<p style="font-size:13px;font-weight:700;color:var(--ink);margin:0 0 8px;">지금까지 낸 문제 ${items.length}개</p>`}
-        <div style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;">
+        ${plain ? "" : `<p style="font-size:13px;font-weight:700;color:var(--ink);margin:0 0 8px;">지금까지 낸 문제 ${items.length}개 <span style="font-weight:600;color:var(--ink-soft);font-size:12px;">(누르면 문제와 정답이 보여요)</span></p>`}
+        <div style="display:flex;flex-direction:column;gap:6px;max-height:380px;overflow-y:auto;">
           ${items.slice().reverse().map((h, i) => `
-            <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft);">
-              <span style="flex-shrink:0;font-weight:700;color:var(--gold-deep);">${items.length - i}.</span>
-              <span style="flex-shrink:0;background:#fff;border-radius:99px;padding:1px 8px;font-size:12px;font-weight:700;color:var(--ink);">${esc(h.unit ? `${h.subject} ${h.unit}` : h.subject)}${h.page ? ` ${esc(h.page)}쪽` : ""}</span>
-              <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${h.editedAt ? `<b style="color:var(--green);font-weight:700;">고침</b> ` : ""}${esc(h.preview)}</span>
-              ${canEdit(h) ? `<button type="button" class="hist-edit" data-edit-id="${esc(h.id)}">고치기</button>`
-                : `<span style="flex-shrink:0;font-size:11px;color:#9AA39E;" title="고치기 기능이 생기기 전에 낸 문제예요">고칠 수 없음</span>`}
-            </div>`).join("")}
+            <details class="hist-item">
+              <summary>
+                <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft);">
+                  <span style="flex-shrink:0;font-weight:700;color:var(--gold-deep);">${items.length - i}.</span>
+                  <span style="flex-shrink:0;background:#fff;border-radius:99px;padding:1px 8px;font-size:12px;font-weight:700;color:var(--ink);">${esc(h.unit ? `${h.subject} ${h.unit}` : h.subject)}${h.page ? ` ${esc(h.page)}쪽` : ""}</span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${h.editedAt ? `<b style="color:var(--green);font-weight:700;">고침</b> ` : ""}${esc(h.preview)}</span>
+                  ${canEdit(h) ? `<button type="button" class="hist-edit" data-edit-id="${esc(h.id)}">고치기</button>`
+                    : `<span style="flex-shrink:0;font-size:11px;color:#9AA39E;" title="고치기 기능이 생기기 전에 낸 문제예요">고칠 수 없음</span>`}
+                  <span class="hist-caret">▼</span>
+                </div>
+              </summary>
+              ${historyDetailHTML(h)}
+            </details>`).join("")}
         </div>
         ${editable ? `<p style="font-size:12px;color:var(--ink-soft);margin:8px 0 0;">문제를 고치면 선생님이 다시 확인한 뒤 골든벨에 나와요.</p>` : ""}
         ${items.some((h) => !canEdit(h)) ? `<p style="font-size:12px;color:var(--ink-soft);margin:4px 0 0;">'고칠 수 없음'은 고치기 기능이 생기기 전에 낸 문제예요. 고치려면 선생님께 말씀드려요.</p>` : ""}
@@ -1182,7 +1217,7 @@ function renderStudentPage(ownerId) {
   }
 
   function bindStepEvents() {
-    document.querySelectorAll("[data-edit-id]").forEach((b) => b.onclick = () => startEdit(b.dataset.editId));
+    document.querySelectorAll("[data-edit-id]").forEach((b) => b.onclick = (e) => { e.preventDefault(); startEdit(b.dataset.editId); });
     if (step === "info") {
       document.querySelectorAll("[data-class]").forEach((b) => b.onclick = () => {
         studentInfo.studentClass = b.dataset.class; saveJSON(infoKey, studentInfo);
@@ -3452,7 +3487,7 @@ function renderGoldenBellPage() {
       <div class="gb-summary">
         <div class="fade-in" style="max-width:min(1100px, 92vw);width:100%;">
           <div class="gate-bell gb-summary-bell">${BELL_SVG}</div>
-          <h1 style="font-family:var(--font-display);font-size:2em;margin-bottom:1em;">골든벨이 종료되었습니다!</h1>
+          <h1 style="font-family:var(--font-display);font-weight:var(--display-weight);font-size:2em;margin-bottom:1em;">골든벨이 종료되었습니다!</h1>
           <div class="gb-summary-grid">
             <div class="gb-summary-box"><p style="color:var(--gb-muted);font-size:.8em;margin:0;">총 문제 수</p><p style="font-size:1.6em;font-weight:800;margin:4px 0 0;">${qs.length}</p></div>
             <div class="gb-summary-box"><p style="color:var(--gb-muted);font-size:.8em;margin:0;">출제 학생 수</p><p style="font-size:1.6em;font-weight:800;margin:4px 0 0;">${students.length}</p></div>
