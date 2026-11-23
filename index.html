@@ -130,7 +130,17 @@
   .q-section{ border-top:1px solid var(--line); padding-top:16px; display:flex; flex-direction:column; gap:14px; }
   .q-section-title{ margin:0; font-weight:800; font-size:15px; display:flex; align-items:center; gap:8px; }
   .q-step{ width:24px; height:24px; border-radius:99px; background:var(--board); color:var(--board-ink); font-size:12px; display:inline-flex; align-items:center; justify-content:center; }
-  .seg{ display:grid; grid-template-columns:1fr 1fr; gap:4px; background:#E3E9E1; border-radius:10px; padding:4px; }
+  .ox-pick{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .ox-btn{ padding:14px 0; border-radius:var(--radius-sm); border:2px solid #C3CCC1; background:#fff; color:var(--ink-soft); font-size:40px; font-weight:800; line-height:1; font-family:var(--font-display); }
+  .ox-btn.active{ border-color:var(--green); background:var(--green-soft); color:var(--green); }
+  .edit-banner{ display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--gold-soft); color:var(--gold-deep); border-radius:10px; padding:10px 12px; font-size:13px; font-weight:700; }
+  .hist-edit{ flex-shrink:0; margin-left:auto; background:#fff; border:1px solid var(--line); border-radius:99px; padding:2px 10px; font-size:12px; font-weight:700; color:var(--board); }
+  .my-qs summary{ cursor:pointer; font-size:13px; font-weight:700; color:var(--ink-soft); }
+  .p-ox{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .p-ox .p-choice{ justify-content:center; font-size:40px; font-family:var(--font-display); padding:18px; }
+  .p-ox .choice-idx{ display:none; }
+  .p-ox .pen-mark{ margin-left:8px; }
+  .seg{ display:grid; grid-template-columns:repeat(3,1fr); gap:4px; background:#E3E9E1; border-radius:10px; padding:4px; }
   .seg-btn{ display:flex; align-items:center; justify-content:center; gap:6px; padding:10px; border-radius:7px; font-weight:700; font-size:14px; color:var(--ink-soft); cursor:pointer; }
   .seg-btn input{ position:absolute; opacity:0; pointer-events:none; }
   .seg-btn.active{ background:#fff; color:var(--ink); box-shadow:0 1px 4px rgba(0,0,0,.08); }
@@ -226,6 +236,9 @@
   .gb-choices{ display:grid; grid-template-columns:1fr; gap:.6em; width:100%; max-width:min(94vw, 2200px); margin-bottom:1.1em; }
   @media(min-width:640px){ .gb-choices{ grid-template-columns:1fr 1fr; } }
   .gb-choice{ padding:.65em .9em; border-radius:.4em; font-size:1.45em; font-weight:700; border:2px solid var(--gb-line); background:var(--gb-surface); display:flex; align-items:center; gap:12px; text-align:left; }
+  .gb-choices.ox{ grid-template-columns:1fr 1fr; max-width:min(80vw, 1400px); }
+  .gb-choices.ox .gb-choice{ justify-content:center; font-family:var(--font-display); font-size:4em; padding:.15em; }
+  .gb-choices.ox .gb-choice-idx{ display:none; }
   .gb-choice.correct{ background:var(--gold); border-color:var(--gold-soft); color:#2A2208; }
   .gb-choice-idx{ width:1.5em; height:1.5em; flex-shrink:0; border-radius:99px; background:var(--gb-surface2); display:flex; align-items:center; justify-content:center; font-size:.75em; }
   .gb-choice.correct .gb-choice-idx{ background:rgba(0,0,0,.15); }
@@ -405,8 +418,71 @@ function applyUnitSettings(data) {
   GRADE_TERM = data && typeof data.gradeTerm === "string" ? data.gradeTerm : "";
 }
 function subjectWithUnit(q) { return q.unit ? `${q.subject} ${q.unit}` : q.subject; }
-const QUESTION_TYPES = { MULTIPLE: "객관식", ESSAY: "서술형" };
-const CHOICE_COUNT = 4;
+const QUESTION_TYPES = { MULTIPLE: "객관식", OX: "O/X", ESSAY: "서술형" };
+const CHOICE_COUNT = 4;   // 객관식 보기 칸 수 (최대)
+const MIN_CHOICES = 2;    // 객관식 보기는 2개 이상이면 됨
+const OX_CHOICES = ["O", "X"];
+// 보기를 고르는 문제(객관식, O/X)인지
+function isChoiceType(t) { return t === QUESTION_TYPES.MULTIPLE || t === QUESTION_TYPES.OX; }
+// 정답 번호 목록 (복수 정답 지원). 예전 문제는 correctChoice 하나만 있음
+function correctList(q) {
+  if (q && Array.isArray(q.correctChoices) && q.correctChoices.length) return q.correctChoices.map(String);
+  return q && q.correctChoice ? [String(q.correctChoice)] : [];
+}
+// "1번, 3번" / "O"
+function correctText(q) {
+  const list = correctList(q);
+  if (q.type === QUESTION_TYPES.OX) return list.map((n) => OX_CHOICES[Number(n) - 1] || n).join(", ");
+  return list.map((n) => `${n}번`).join(", ");
+}
+// "1번 사과, 3번 배" / "O"
+function correctDetail(q) {
+  if (q.type === QUESTION_TYPES.OX) return correctText(q);
+  const ch = q.choices || [];
+  return correctList(q).map((n) => `${n}번 ${ch[Number(n) - 1] || ""}`.trim()).join(", ");
+}
+// 정답 설명을 비워 두었을 때 자동으로 들어가는 답 (정답 보기의 내용)
+function defaultAnswerFor(type, choices, corrects) {
+  if (!isChoiceType(type)) return "";
+  return corrects.map((n) => (choices || [])[Number(n) - 1]).filter(Boolean).join(", ");
+}
+// 빈 보기 칸을 빼고 정답 번호를 다시 맞춤 (예: 1,2,4번만 쓰면 4번 → 3번)
+function compactChoices(rawChoices, corrects) {
+  const map = {}; const out = [];
+  (rawChoices || []).forEach((c, i) => { const t = String(c || "").trim(); if (t) { out.push(t); map[String(i + 1)] = String(out.length); } });
+  const cc = [...new Set((corrects || []).map((n) => map[String(n)]).filter(Boolean))].sort();
+  return { choices: out, correctChoices: cc };
+}
+// 입력 폼 값 → 저장할 보기·정답 필드
+function buildChoiceFields(f) {
+  if (f.type === QUESTION_TYPES.MULTIPLE) {
+    const r = compactChoices(f.choices, f.correctChoices);
+    return { choices: r.choices, correctChoices: r.correctChoices, correctChoice: r.correctChoices[0] || "" };
+  }
+  if (f.type === QUESTION_TYPES.OX) return { choices: [...OX_CHOICES], correctChoices: [String(f.oxAnswer)], correctChoice: String(f.oxAnswer) };
+  return { choices: [], correctChoices: [], correctChoice: "" };
+}
+// 저장된 문제 → 입력 폼 값 (학생 고치기·관리자 수정에서 같이 씀)
+function questionToForm(q) {
+  const type = Object.values(QUESTION_TYPES).includes(q.type) ? q.type : QUESTION_TYPES.MULTIPLE;
+  const list = correctList(q);
+  const auto = defaultAnswerFor(type, q.choices || [], list);
+  const acc = acceptedList(q);
+  return {
+    subject: q.subject || "", unit: q.unit || "", page: q.page || "", noPage: !q.page,
+    accepted: acc.join("\n"), noAccepted: type === QUESTION_TYPES.ESSAY && acc.length === 0,
+    type, question: q.question || "",
+    answer: isChoiceType(type) && (q.answer || "") === auto ? "" : (q.answer || ""),
+    choices: type === QUESTION_TYPES.MULTIPLE ? [...(q.choices || []), "", "", "", ""].slice(0, CHOICE_COUNT) : ["", "", "", ""],
+    correctChoices: type === QUESTION_TYPES.MULTIPLE ? list : [],
+    oxAnswer: type === QUESTION_TYPES.OX ? (list[0] || "") : "",
+  };
+}
+// 학생이 자기 문제를 고칠 때 쓰는 열쇠 (이 기기에만 저장, 고칠 때마다 새로 바뀜)
+function newEditToken() {
+  const a = new Uint8Array(16); crypto.getRandomValues(a);
+  return Array.from(a).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 const REVEAL_MODES = { FULL_NAME: "실명 공개", NAME_ONLY: "이름만 공개", ANONYMOUS: "익명", AFTER_ANSWER: "정답 공개 후 표시" };
 const TIMER_OPTIONS = [{ label: "제한 없음", value: null }, { label: "10초", value: 10 }, { label: "20초", value: 20 }, { label: "30초", value: 30 }];
 const DEFAULT_QUESTION_COUNT = 20;
@@ -491,7 +567,7 @@ function validateStudentInfo({ studentClass, number, name }) {
   if (name.trim().length > 10) return { valid: false, message: "이름이 너무 깁니다." };
   return { valid: true };
 }
-function validateQuestion({ type, question, answer, choices, correctChoice }) {
+function validateQuestion({ type, question, answer, choices, correctChoices, oxAnswer }) {
   if (!question || !question.trim()) return { valid: false, message: "문제를 입력해주세요." };
   const q = question.trim();
   if (q.length < 5) return { valid: false, message: "문제가 너무 짧습니다. 최소 5자 이상 입력해주세요." };
@@ -499,17 +575,22 @@ function validateQuestion({ type, question, answer, choices, correctChoice }) {
   if (isRepeatedChar(q)) return { valid: false, message: "의미 없는 반복 문자는 사용할 수 없습니다." };
   if (containsBadWord(q)) return { valid: false, message: "문제에 부적절한 단어가 포함되어 있습니다." };
   if (type === QUESTION_TYPES.MULTIPLE) {
-    if (!choices || choices.length !== CHOICE_COUNT) return { valid: false, message: `보기를 ${CHOICE_COUNT}개 모두 입력해주세요.` };
-    for (let i = 0; i < choices.length; i++) {
-      if (!choices[i] || !choices[i].trim()) return { valid: false, message: `보기${i + 1}을 입력해주세요.` };
-      if (containsBadWord(choices[i])) return { valid: false, message: `보기${i + 1}에 부적절한 단어가 포함되어 있습니다.` };
+    const raw = (choices || []).map((c) => String(c || "").trim());
+    for (let i = 0; i < raw.length; i++) {
+      if (raw[i] && containsBadWord(raw[i])) return { valid: false, message: `보기${i + 1}에 부적절한 단어가 포함되어 있습니다.` };
     }
-    const trimmed = choices.map((c) => c.trim());
-    if (new Set(trimmed).size !== trimmed.length) return { valid: false, message: "같은 내용의 보기가 있습니다. 보기를 서로 다르게 입력해주세요." };
-    if (!correctChoice) return { valid: false, message: "정답 번호를 선택해주세요." };
+    const filled = raw.filter(Boolean);
+    if (filled.length < MIN_CHOICES) return { valid: false, message: `보기를 ${MIN_CHOICES}개 이상 입력해주세요.` };
+    if (new Set(filled).size !== filled.length) return { valid: false, message: "같은 내용의 보기가 있습니다. 보기를 서로 다르게 입력해주세요." };
+    const marks = correctChoices || [];
+    if (!marks.length) return { valid: false, message: "정답 보기의 번호를 하나 이상 눌러 주세요." };
+    if (marks.some((n) => !raw[Number(n) - 1])) return { valid: false, message: "정답으로 고른 보기 칸이 비어 있어요." };
+    if (marks.length >= filled.length) return { valid: false, message: "모든 보기를 정답으로 할 수는 없어요." };
+  } else if (type === QUESTION_TYPES.OX) {
+    if (oxAnswer !== "1" && oxAnswer !== "2") return { valid: false, message: "정답이 O인지 X인지 골라주세요." };
   }
-  // 객관식은 정답 텍스트를 비워 두면 선택한 정답 보기로 자동 채움
-  if (type !== QUESTION_TYPES.MULTIPLE && (!answer || !answer.trim())) return { valid: false, message: "모범 답안을 입력해주세요." };
+  // 객관식·O/X는 정답 텍스트를 비워 두면 선택한 정답 보기로 자동 채움
+  if (type === QUESTION_TYPES.ESSAY && (!answer || !answer.trim())) return { valid: false, message: "모범 답안을 입력해주세요." };
   if (answer && containsBadWord(answer)) return { valid: false, message: "답에 부적절한 단어가 포함되어 있습니다." };
   return { valid: true };
 }
@@ -530,11 +611,15 @@ function pickRandomQuestions(pool, options) {
   else if (scope === "subject" && scopeValue) scoped = pool.filter((q) => q.subject === scopeValue);
   else if (scope === "unit" && scopeValue) scoped = pool.filter((q) => `${q.subject}||${q.unit || ""}` === scopeValue);
 
-  const multipleList = shuffle(scoped.filter((q) => q.type === QUESTION_TYPES.MULTIPLE));
+  // 비율 지정에서는 O/X도 객관식 쪽에 넣어 셈
+  const multipleList = shuffle(scoped.filter((q) =>
+    typeMode === "oxOnly" ? q.type === QUESTION_TYPES.OX
+    : typeMode === "multipleOnly" ? q.type === QUESTION_TYPES.MULTIPLE
+    : isChoiceType(q.type)));
   const essayList = shuffle(scoped.filter((q) => q.type === QUESTION_TYPES.ESSAY));
 
   let needMultiple = 0, needEssay = 0;
-  if (typeMode === "multipleOnly") needMultiple = count;
+  if (typeMode === "multipleOnly" || typeMode === "oxOnly") needMultiple = count;
   else if (typeMode === "essayOnly") needEssay = count;
   else { needMultiple = Math.round((count * multiplePercent) / 100); needEssay = count - needMultiple; }
 
@@ -565,7 +650,7 @@ function exportQuestionsToCSV(questions, filename = "questions.csv") {
     const createdAt = q.createdAt?.toDate ? q.createdAt.toDate().toLocaleString("ko-KR") : "";
     return [q.class, q.number, q.name, q.subject, q.gradeTerm || "", q.unit || "", q.page || "", q.type, q.question, q.answer, acceptedList(q).join(" | "),
       choices[0] || "", choices[1] || "", choices[2] || "", choices[3] || "",
-      q.correctChoice || "", createdAt, q.isApproved ? "승인" : "미승인"].map(escapeCSV);
+      correctList(q).join(","), createdAt, q.isApproved ? "승인" : "미승인"].map(escapeCSV);
   });
   const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -608,22 +693,32 @@ function csvRowsToQuestions(rows) {
     const type = get(r, "유형");
     const question = get(r, "문제");
     const subject = get(r, "과목");
-    const choices = [1, 2, 3, 4].map((n) => get(r, `보기${n}`));
-    const correctChoice = get(r, "정답번호");
+    const rawChoices = [1, 2, 3, 4].map((n) => get(r, `보기${n}`));
+    const correctRaw = get(r, "정답번호").toUpperCase();
     let answer = get(r, "답");
     if (!question || !subject || !Object.values(QUESTION_TYPES).includes(type)) { skipped++; return; }
+    let cf = { choices: [], correctChoices: [], correctChoice: "" };
     if (type === QUESTION_TYPES.MULTIPLE) {
-      if (choices.some((c) => !c) || !/^[1-4]$/.test(correctChoice)) { skipped++; return; }
-      if (!answer) answer = choices[Number(correctChoice) - 1];
+      // 정답번호: "2" 또는 복수 정답 "1,3"
+      if (!/^[1-4](\s*[,|\/]\s*[1-4])*$/.test(correctRaw)) { skipped++; return; }
+      const marks = correctRaw.split(/[,|\/]/).map((x) => x.trim());
+      if (marks.some((n) => !rawChoices[Number(n) - 1])) { skipped++; return; }
+      const c = compactChoices(rawChoices, marks);
+      if (c.choices.length < MIN_CHOICES) { skipped++; return; }
+      cf = { choices: c.choices, correctChoices: c.correctChoices, correctChoice: c.correctChoices[0] };
+    } else if (type === QUESTION_TYPES.OX) {
+      const ox = correctRaw === "O" || correctRaw === "1" ? "1" : correctRaw === "X" || correctRaw === "2" ? "2" : "";
+      if (!ox) { skipped++; return; }
+      cf = { choices: [...OX_CHOICES], correctChoices: [ox], correctChoice: ox };
     } else if (!answer) { skipped++; return; }
+    if (!answer) answer = defaultAnswerFor(type, cf.choices, cf.correctChoices);
     const page = normalizePage(get(r, "교과서 쪽수"));
     items.push({
       class: get(r, "반") || "다른 반", number: get(r, "번호"), name: get(r, "이름") || "익명",
       subject, gradeTerm: /^[1-6]-[12]$/.test(get(r, "학년-학기")) ? get(r, "학년-학기") : "", unit: get(r, "단원"), page: PAGE_PATTERN.test(page) ? page : "",
       type, question: question.slice(0, 500), answer: answer.slice(0, 500),
-      acceptedAnswers: type === QUESTION_TYPES.MULTIPLE ? [] : parseAccepted(get(r, "인정 답안").replace(/\s*\|\s*/g, "\n")),
-      choices: type === QUESTION_TYPES.MULTIPLE ? choices : [],
-      correctChoice: type === QUESTION_TYPES.MULTIPLE ? correctChoice : "",
+      acceptedAnswers: type === QUESTION_TYPES.ESSAY ? parseAccepted(get(r, "인정 답안").replace(/\s*\|\s*/g, "\n")) : [],
+      ...cf,
     });
   });
   return { items, skipped, error: "" };
@@ -715,7 +810,7 @@ onAuthStateChanged(auth, async (user) => {
    학생 화면
    ========================================================================= */
 function emptyQuestion() {
-  return { subject: "", unit: "", page: "", noPage: false, accepted: "", noAccepted: false, type: QUESTION_TYPES.MULTIPLE, question: "", answer: "", choices: ["", "", "", ""], correctChoice: "" };
+  return { subject: "", unit: "", page: "", noPage: false, accepted: "", noAccepted: false, type: QUESTION_TYPES.MULTIPLE, question: "", answer: "", choices: ["", "", "", ""], correctChoices: [], oxAnswer: "", editingId: "" };
 }
 // 교과서 쪽수: "45" 또는 "45~46" 형태 허용
 const PAGE_PATTERN = /^\d{1,3}(\s*[~\-]\s*\d{1,3})?$/;
@@ -790,6 +885,10 @@ function renderStudentPage(ownerId) {
   let studentInfo = loadJSON(infoKey, { studentClass: "", number: "", name: "" });
   let draft = { ...emptyQuestion(), ...loadJSON(draftKey, {}) };
   if (!Array.isArray(draft.choices) || draft.choices.length !== CHOICE_COUNT) draft.choices = ["", "", "", ""];
+  // 예전 형식으로 저장된 임시 저장(정답 하나) → 복수 정답 형식으로
+  if (!Array.isArray(draft.correctChoices)) draft.correctChoices = draft.correctChoice ? [String(draft.correctChoice)] : [];
+  delete draft.correctChoice;
+  if (!Object.values(QUESTION_TYPES).includes(draft.type)) draft.type = QUESTION_TYPES.MULTIPLE;
   let step = "info";
   let error = "";
   let submitting = false;
@@ -824,20 +923,37 @@ function renderStudentPage(ownerId) {
     list.push({ ...entry, student: studentKeyOf(studentInfo) });
     saveJSON(historyKey, list.slice(-100));
   }
-  function historyListHTML(items) {
+  function updateHistory(id, patch) {
+    const all = loadJSON(historyKey, []);
+    const list = Array.isArray(all) ? all : [];
+    const i = list.findIndex((h) => h.id === id);
+    if (i >= 0) { list[i] = { ...list[i], ...patch }; saveJSON(historyKey, list); }
+  }
+  const canEdit = (h) => !!(h && h.id && h.token && h.data);
+  function historyListHTML(items, { plain = false } = {}) {
     if (items.length === 0) return "";
+    const editable = items.some(canEdit);
     return `
-      <div style="margin-top:14px;background:var(--cream);border-radius:14px;padding:14px 16px;text-align:left;">
-        <p style="font-size:13px;font-weight:700;color:var(--ink);margin:0 0 8px;">지금까지 낸 문제 ${items.length}개</p>
-        <div style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;">
+      <div style="${plain ? "margin-top:10px;" : "margin-top:14px;"}background:var(--cream);border-radius:14px;padding:14px 16px;text-align:left;">
+        ${plain ? "" : `<p style="font-size:13px;font-weight:700;color:var(--ink);margin:0 0 8px;">지금까지 낸 문제 ${items.length}개</p>`}
+        <div style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;">
           ${items.slice().reverse().map((h, i) => `
-            <div style="display:flex;gap:8px;font-size:13px;color:var(--ink-soft);">
+            <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft);">
               <span style="flex-shrink:0;font-weight:700;color:var(--gold-deep);">${items.length - i}.</span>
               <span style="flex-shrink:0;background:#fff;border-radius:99px;padding:1px 8px;font-size:12px;font-weight:700;color:var(--ink);">${esc(h.unit ? `${h.subject} ${h.unit}` : h.subject)}${h.page ? ` ${esc(h.page)}쪽` : ""}</span>
-              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(h.preview)}</span>
+              <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${h.editedAt ? `<b style="color:var(--green);font-weight:700;">고침</b> ` : ""}${esc(h.preview)}</span>
+              ${canEdit(h) ? `<button type="button" class="hist-edit" data-edit-id="${esc(h.id)}">고치기</button>` : ""}
             </div>`).join("")}
         </div>
+        ${editable ? `<p style="font-size:12px;color:var(--ink-soft);margin:8px 0 0;">문제를 고치면 선생님이 다시 확인한 뒤 골든벨에 나와요.</p>` : ""}
       </div>`;
+  }
+  function startEdit(id) {
+    const h = myHistory().find((x) => x.id === id);
+    if (!canEdit(h)) return;
+    draft = { ...emptyQuestion(), ...questionToForm(h.data), editingId: id };
+    saveJSON(draftKey, draft);
+    step = "question"; error = ""; paintDots(); paintStep(); window.scrollTo(0, 0);
   }
 
   app.innerHTML = `<div class="center-screen"><div class="spinner spin"></div></div>`;
@@ -929,14 +1045,29 @@ function renderStudentPage(ownerId) {
 
   function questionStepHTML() {
     const isMultiple = draft.type === QUESTION_TYPES.MULTIPLE;
-    const doneCount = myHistory().length;
+    const isOX = draft.type === QUESTION_TYPES.OX;
+    const isChoice = isMultiple || isOX;
+    const hist = myHistory();
+    const doneCount = hist.length;
     const units = unitsFor(draft.subject);
+    const editing = draft.editingId ? hist.find((h) => h.id === draft.editingId) : null;
+    const editNo = editing ? hist.indexOf(editing) + 1 : 0;
     return `
       <div class="fade-in" style="display:flex;flex-direction:column;gap:16px;">
         <div class="who-row">
           <span class="who-chip">${esc(studentInfo.studentClass)} ${esc(studentInfo.number)}번 ${esc(studentInfo.name)}</span>
-          <span class="count-chip ${doneCount ? "on" : ""}">${doneCount ? `${doneCount + 1}번째 문제` : "첫 번째 문제"}${remainingCount() !== null ? `, ${remainingCount()}개 더 낼 수 있음` : ""}</span>
+          ${editing ? `<span class="count-chip on">${editNo}번째 문제 고치는 중</span>`
+            : `<span class="count-chip ${doneCount ? "on" : ""}">${doneCount ? `${doneCount + 1}번째 문제` : "첫 번째 문제"}${remainingCount() !== null ? `, ${remainingCount()}개 더 낼 수 있음` : ""}</span>`}
         </div>
+        ${editing ? `
+        <div class="edit-banner">
+          <span>내가 낸 ${editNo}번째 문제를 고치고 있어요</span>
+          <button type="button" class="btn btn-ghost" id="cancel-edit-btn" style="padding:6px 10px;font-size:12px;background:#fff;">고치기 그만두기</button>
+        </div>` : doneCount ? `
+        <details class="my-qs">
+          <summary>내가 낸 문제 ${doneCount}개 보기·고치기</summary>
+          ${historyListHTML(hist, { plain: true })}
+        </details>` : ""}
 
         <div class="q-section">
           <p class="q-section-title"><span class="q-step">1</span>어디에서 낸 문제인가요?</p>
@@ -983,19 +1114,27 @@ function renderStudentPage(ownerId) {
           ${isMultiple ? `
           <div>
             <label class="label">보기 <span style="font-weight:600;font-size:12px;color:var(--ink-soft);">— 정답 보기의 번호를 눌러 표시해요</span></label>
+            <p style="font-size:13px;color:var(--ink-soft);margin:-2px 0 8px;line-height:1.5;">보기는 ${MIN_CHOICES}개 이상이면 돼요. 정답이 여러 개면 번호를 여러 개 눌러요.</p>
             <div style="display:flex;flex-direction:column;gap:8px;">
               ${Array.from({ length: CHOICE_COUNT }).map((_, i) => `
                 <div class="choice-row">
-                  <button type="button" class="choice-mark correct-btn ${draft.correctChoice === String(i + 1) ? "active" : ""}" data-idx="${i + 1}" title="${i + 1}번을 정답으로">${i + 1}</button>
-                  <input class="input choice-input" data-idx="${i}" type="text" placeholder="보기 ${i + 1}" value="${esc(draft.choices[i] || "")}">
+                  <button type="button" class="choice-mark correct-btn ${draft.correctChoices.includes(String(i + 1)) ? "active" : ""}" data-idx="${i + 1}" title="${i + 1}번을 정답으로">${i + 1}</button>
+                  <input class="input choice-input" data-idx="${i}" type="text" placeholder="보기 ${i + 1}${i >= MIN_CHOICES ? " (안 써도 돼요)" : ""}" value="${esc(draft.choices[i] || "")}">
                 </div>`).join("")}
             </div>
           </div>` : ""}
+          ${isOX ? `
           <div>
-            <label class="label">${isMultiple ? "정답 설명 (선택)" : "모범 답안"}</label>
-            <textarea class="input" id="a-input" rows="2" placeholder="${isMultiple ? "비워 두면 고른 정답 보기가 자동으로 들어가요" : "모범 답안을 입력하세요"}" style="resize:vertical;">${esc(draft.answer)}</textarea>
+            <label class="label">정답</label>
+            <div class="ox-pick">
+              ${OX_CHOICES.map((c, i) => `<button type="button" class="ox-btn ${draft.oxAnswer === String(i + 1) ? "active" : ""}" data-ox="${i + 1}">${c}</button>`).join("")}
+            </div>
+          </div>` : ""}
+          <div>
+            <label class="label">${isChoice ? "정답 설명 (선택)" : "모범 답안"}</label>
+            <textarea class="input" id="a-input" rows="2" placeholder="${isMultiple ? "비워 두면 고른 정답 보기가 자동으로 들어가요" : isOX ? "왜 그런지 적어 주면 좋아요 (안 써도 돼요)" : "모범 답안을 입력하세요"}" style="resize:vertical;">${esc(draft.answer)}</textarea>
           </div>
-          ${isMultiple ? "" : `
+          ${isChoice ? "" : `
           <div>
             <label class="label">정답으로 인정할 답</label>
             <p style="font-size:13px;color:var(--ink-soft);margin:-2px 0 8px;line-height:1.5;">모범 답안과 뜻이 같은 다른 표현을 한 줄에 하나씩 적어요. 예) 세종, 세종 대왕, 이도</p>
@@ -1012,7 +1151,7 @@ function renderStudentPage(ownerId) {
           <button class="btn btn-ghost" id="prev-btn" style="flex:1;">이전</button>
           <button class="btn btn-gold" id="submit-btn" style="flex:2;display:flex;align-items:center;justify-content:center;gap:8px;font-size:16px;" ${submitting ? "disabled" : ""}>
             ${submitting ? `<span class="spinner spin" style="width:16px;height:16px;border-width:2px;"></span>` : ""}
-            ${submitting ? "제출 중..." : "제출하기 "}
+            ${submitting ? (editing ? "저장 중..." : "제출 중...") : (editing ? "고친 내용 저장" : "제출하기")}
           </button>
         </div>
       </div>`;
@@ -1026,8 +1165,9 @@ function renderStudentPage(ownerId) {
     return `
       <div class="pop" style="text-align:center;padding:14px 0;">
         <div style="width:64px;height:64px;margin:0 auto 16px;border-radius:99px;background:var(--green-soft);display:flex;align-items:center;justify-content:center;font-size:30px;"></div>
-        <h2 style="font-size:18px;font-weight:800;">${items.length > 1 ? `${items.length}번째 문제가 등록되었습니다!` : "문제가 성공적으로 등록되었습니다!"}</h2>
-        <p style="font-size:13px;color:var(--ink-soft);margin-top:6px;">${esc(lastSubmitted.subject)}, ${lastSubmitted.submittedAt.toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" })} 제출</p>
+        <h2 style="font-size:18px;font-weight:800;">${lastSubmitted.edited ? "고친 문제를 저장했어요!" : items.length > 1 ? `${items.length}번째 문제가 등록되었습니다!` : "문제가 성공적으로 등록되었습니다!"}</h2>
+        <p style="font-size:13px;color:var(--ink-soft);margin-top:6px;">${esc(lastSubmitted.subject)}, ${lastSubmitted.submittedAt.toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" })} ${lastSubmitted.edited ? "수정" : "제출"}</p>
+        ${lastSubmitted.edited ? `<p style="font-size:13px;color:var(--ink-soft);margin-top:4px;">선생님이 다시 확인한 뒤 골든벨에 나와요.</p>` : ""}
         ${historyListHTML(items)}
         ${reachedMax ? `<p style="margin-top:14px;font-size:13px;font-weight:700;color:#7E5C0E;background:#F5E7BC;border-radius:12px;padding:10px 12px;">한 사람당 ${maxPerStudent}개까지 낼 수 있어요. 모두 냈어요! </p>` : ""}
         <div style="display:flex;flex-direction:column;gap:8px;margin-top:20px;">
@@ -1040,6 +1180,7 @@ function renderStudentPage(ownerId) {
   }
 
   function bindStepEvents() {
+    document.querySelectorAll("[data-edit-id]").forEach((b) => b.onclick = () => startEdit(b.dataset.editId));
     if (step === "info") {
       document.querySelectorAll("[data-class]").forEach((b) => b.onclick = () => {
         studentInfo.studentClass = b.dataset.class; saveJSON(infoKey, studentInfo);
@@ -1086,10 +1227,23 @@ function renderStudentPage(ownerId) {
       document.querySelectorAll(".choice-input").forEach((inp) => inp.oninput = (e) => {
         draft.choices[Number(inp.dataset.idx)] = e.target.value; saveJSON(draftKey, draft);
       });
+      // 정답 번호는 여러 개 고를 수 있음 (복수 정답)
       document.querySelectorAll(".correct-btn").forEach((b) => b.onclick = () => {
-        draft.correctChoice = b.dataset.idx; saveJSON(draftKey, draft);
-        document.querySelectorAll(".correct-btn").forEach((x) => x.classList.toggle("active", x === b));
+        const n = b.dataset.idx;
+        const set = new Set(draft.correctChoices);
+        if (set.has(n)) set.delete(n); else set.add(n);
+        draft.correctChoices = [...set].sort(); saveJSON(draftKey, draft);
+        b.classList.toggle("active", set.has(n));
       });
+      document.querySelectorAll(".ox-btn").forEach((b) => b.onclick = () => {
+        draft.oxAnswer = b.dataset.ox; saveJSON(draftKey, draft);
+        document.querySelectorAll(".ox-btn").forEach((x) => x.classList.toggle("active", x === b));
+      });
+      const cancelEdit = document.getElementById("cancel-edit-btn");
+      if (cancelEdit) cancelEdit.onclick = () => {
+        draft = { ...emptyQuestion(), subject: draft.subject, type: draft.type };
+        removeKey(draftKey); error = ""; paintStep();
+      };
       document.getElementById("prev-btn").onclick = () => { step = "info"; paintDots(); paintStep(); };
       document.getElementById("submit-btn").onclick = handleSubmit;
     } else if (step === "success") {
@@ -1131,14 +1285,44 @@ function renderStudentPage(ownerId) {
     const result = validateQuestion(draft);
     if (!result.valid) { error = result.message; paintStep(); return; }
 
-    const isMultiple = draft.type === QUESTION_TYPES.MULTIPLE;
-    const choices = isMultiple ? draft.choices.map((c) => c.trim()) : [];
-    const answer = draft.answer.trim() || (isMultiple ? choices[Number(draft.correctChoice) - 1] : "");
-    const acceptedAnswers = isMultiple || draft.noAccepted ? [] : parseAccepted(draft.accepted).filter((x) => normAnswer(x) !== normAnswer(answer));
-    if (!isMultiple && !draft.noAccepted && acceptedAnswers.length === 0) {
+    const isEssay = draft.type === QUESTION_TYPES.ESSAY;
+    const cf = buildChoiceFields(draft);
+    const answer = draft.answer.trim() || defaultAnswerFor(draft.type, cf.choices, cf.correctChoices);
+    const acceptedAnswers = !isEssay || draft.noAccepted ? [] : parseAccepted(draft.accepted).filter((x) => normAnswer(x) !== normAnswer(answer));
+    if (isEssay && !draft.noAccepted && acceptedAnswers.length === 0) {
       error = "정답으로 인정할 다른 답을 적거나, '모범 답안만 정답이에요'에 체크해 주세요."; paintStep(); return;
     }
     if (acceptedAnswers.some((x) => containsBadWord(x))) { error = "인정할 답에 부적절한 단어가 있어요."; paintStep(); return; }
+    const qText = draft.question.trim();
+    const preview = qText.length > 30 ? qText.slice(0, 30) + "..." : qText;
+    const content = { subject: draft.subject, gradeTerm: GRADE_TERM, unit, page, type: draft.type, question: qText, answer, acceptedAnswers, ...cf };
+
+    // ---- 이미 낸 문제 고치기 ----
+    if (draft.editingId) {
+      const h = myHistory().find((x) => x.id === draft.editingId);
+      if (!canEdit(h)) { draft.editingId = ""; saveJSON(draftKey, draft); error = "고칠 문제를 찾지 못했어요. 새 문제로 제출하려면 다시 눌러 주세요."; paintStep(); return; }
+      submitting = true; error = ""; paintStep();
+      try {
+        const newToken = newEditToken();
+        // editProof(지금 열쇠)가 맞아야 Firestore 규칙이 수정을 허락함. 고칠 때마다 열쇠를 새로 바꿈
+        await updateDoc(doc(db, COLLECTIONS.QUESTIONS, h.id), {
+          ...content, isApproved: false, studentEditedAt: serverTimestamp(), editProof: h.token, editToken: newToken,
+        });
+        updateHistory(h.id, { token: newToken, data: content, subject: draft.subject, unit, page, preview, editedAt: Date.now() });
+        lastSubmitted = { subject: draft.subject, unit, type: draft.type, questionPreview: preview, submittedAt: new Date(), edited: true };
+        removeKey(draftKey);
+        draft = { ...emptyQuestion(), subject: draft.subject, type: draft.type };
+        submitting = false; step = "success"; paintDots(); paintStep();
+      } catch (err) {
+        console.error("문제 수정 오류:", err);
+        submitting = false;
+        error = err && (err.code === "permission-denied" || err.code === "not-found")
+          ? "고칠 수 없어요. 선생님이 문제를 지웠거나 문제 접수가 마감되었을 수 있어요."
+          : "저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+        paintStep();
+      }
+      return;
+    }
 
     submitting = true; error = ""; paintStep();
     try {
@@ -1152,20 +1336,21 @@ function renderStudentPage(ownerId) {
         paintStep(); return;
       }
       const batch = writeBatch(db);
-      batch.set(doc(collection(db, COLLECTIONS.QUESTIONS)), {
+      const qRef = doc(collection(db, COLLECTIONS.QUESTIONS));
+      const token = newEditToken();
+      batch.set(qRef, {
         ownerId, countKey,
         class: studentInfo.studentClass, number: String(Number(studentInfo.number)), name: studentInfo.name.trim(),
-        subject: draft.subject, gradeTerm: GRADE_TERM, unit, page, type: draft.type, question: draft.question.trim(), answer, acceptedAnswers,
-        choices,
-        correctChoice: draft.type === QUESTION_TYPES.MULTIPLE ? draft.correctChoice : "",
+        ...content,
+        editToken: token,
         createdAt: serverTimestamp(), isApproved: false, isDeleted: false,
       });
       batch.set(doc(db, COLLECTIONS.SUBMIT_COUNTS, countKey), { ownerId, count: before + 1 });
       await batch.commit();
       serverCount = before + 1;
-      const qText = draft.question.trim();
-      lastSubmitted = { subject: draft.subject, unit, type: draft.type, questionPreview: qText.length > 30 ? qText.slice(0, 30) + "..." : qText, submittedAt: new Date() };
-      addHistory({ subject: draft.subject, unit, page, preview: lastSubmitted.questionPreview, at: Date.now() });
+      lastSubmitted = { subject: draft.subject, unit, type: draft.type, questionPreview: preview, submittedAt: new Date() };
+      // 나중에 고칠 수 있도록 문제 번호(id)·열쇠·내용을 이 기기에 남겨 둠
+      addHistory({ id: qRef.id, token, data: content, subject: draft.subject, unit, page, preview, at: Date.now() });
       removeKey(draftKey);
       draft = { ...emptyQuestion(), subject: draft.subject, type: draft.type };
       submitting = false;
@@ -1201,7 +1386,7 @@ function isPracticeQuestion(q, scope = "both", classes = []) {
 function toPracticeItem(q) {
   return {
     id: q.id, subject: q.subject || "", unit: q.unit || "", page: q.page || "", type: q.type,
-    question: q.question || "", answer: q.answer || "", acceptedAnswers: acceptedList(q), choices: q.choices || [], correctChoice: q.correctChoice || "",
+    question: q.question || "", answer: q.answer || "", acceptedAnswers: acceptedList(q), choices: q.choices || [], correctChoice: q.correctChoice || "", correctChoices: correctList(q),
   };
 }
 function hashString(str) { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return String(h >>> 0); }
@@ -1319,8 +1504,10 @@ function renderPracticePage(ownerId) {
 
   function paintPlay() {
     const q = set[idx];
-    const isMultiple = q.type === QUESTION_TYPES.MULTIPLE;
-    const correct = String(q.correctChoice || "");
+    const isMultiple = isChoiceType(q.type); // 객관식·O/X 모두 보기를 눌러 풂
+    const isOX = q.type === QUESTION_TYPES.OX;
+    const corrects = correctList(q);          // 복수 정답이면 그중 하나만 골라도 정답
+    const autoAnswer = defaultAnswerFor(q.type, q.choices || [], corrects);
     const done = picked !== null || (revealed && !isMultiple && results[idx] !== undefined);
     const score = results.filter(Boolean).length;
     app.innerHTML = shell(`
@@ -1332,17 +1519,17 @@ function renderPracticePage(ownerId) {
         </div>
         <p class="p-question">${esc(q.question)}</p>
         ${isMultiple ? `
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            ${(q.choices || []).map((c, i) => {
+          <div class="${isOX ? "p-ox" : ""}" style="${isOX ? "" : "display:flex;flex-direction:column;gap:8px;"}">
+            ${(q.choices && q.choices.length ? q.choices : isOX ? OX_CHOICES : []).map((c, i) => {
               const n = String(i + 1);
               let style = "";
               if (picked !== null) {
-                if (n === correct) style = "background:var(--green-soft);border-color:var(--green);color:var(--green);";
+                if (corrects.includes(n)) style = "background:var(--green-soft);border-color:var(--green);color:var(--green);";
                 else if (n === picked) style = "background:var(--red-soft);border-color:var(--red);color:var(--red);";
               }
               return `<button type="button" class="p-choice" data-n="${n}" style="${style}" ${picked !== null ? "disabled" : ""}>
                 <span class="choice-idx">${n}</span><span style="flex:1;">${esc(c)}</span>
-                ${picked !== null && n === correct ? `<span class="pen-mark">○</span>` : picked === n ? `<span class="pen-mark">／</span>` : ""}
+                ${picked !== null && corrects.includes(n) ? `<span class="pen-mark">○</span>` : picked === n ? `<span class="pen-mark">／</span>` : ""}
               </button>`;
             }).join("")}
           </div>` : `
@@ -1363,15 +1550,15 @@ function renderPracticePage(ownerId) {
             </div>` : ""}`}`}
         ${done ? `
           <div class="fade-in" style="border-radius:14px;padding:12px 14px;background:${results[idx] ? "var(--green-soft)" : "var(--red-soft)"};color:${results[idx] ? "var(--green)" : "var(--red)"};font-weight:700;font-size:14px;">
-            ${results[idx] ? "정답이에요! " : `아쉬워요!${isMultiple ? ` 정답은 ${esc(correct)}번이에요.` : ""}`}
-            ${isMultiple && q.answer && q.answer !== (q.choices || [])[Number(correct) - 1] ? `<div style="font-weight:600;color:var(--ink);margin-top:6px;white-space:pre-wrap;">${esc(q.answer)}</div>` : ""}
+            ${results[idx] ? `정답이에요!${isMultiple && corrects.length > 1 ? ` (정답: ${esc(correctText(q))})` : ""}` : `아쉬워요!${isMultiple ? ` 정답: ${esc(correctText(q))}` : ""}`}
+            ${isMultiple && q.answer && q.answer !== autoAnswer ? `<div style="font-weight:600;color:var(--ink);margin-top:6px;white-space:pre-wrap;">${esc(q.answer)}</div>` : ""}
             ${q.page ? `<div style="font-weight:600;color:var(--ink-soft);margin-top:4px;">${esc(pageText(q))}${results[idx] ? "" : "을 다시 읽어 보세요."}</div>` : ""}
           </div>
           <button class="btn btn-gold" id="p-next" style="width:100%;">${idx === set.length - 1 ? "결과 보기" : "다음 문제"}</button>` : ""}
       </div>`);
     document.querySelectorAll(".p-choice").forEach((b) => b.onclick = () => {
       if (picked !== null) return;
-      picked = b.dataset.n; results[idx] = picked === correct; paintPlay();
+      picked = b.dataset.n; results[idx] = corrects.includes(picked); paintPlay();
     });
     const rv = document.getElementById("p-reveal");
     if (rv) rv.onclick = () => {
@@ -1408,7 +1595,7 @@ function renderPracticePage(ownerId) {
             ${wrong.map((q) => `
               <div style="font-size:13px;line-height:1.5;">
                 <div style="font-weight:700;color:var(--ink);white-space:pre-wrap;">${esc(q.question)}</div>
-                <div style="color:var(--green);font-weight:700;">정답: ${q.type === QUESTION_TYPES.MULTIPLE ? `${esc(q.correctChoice)}번 ${esc((q.choices || [])[Number(q.correctChoice) - 1] || "")}` : esc([q.answer, ...acceptedList(q)].join(", "))}</div>
+                <div style="color:var(--green);font-weight:700;">정답: ${isChoiceType(q.type) ? esc(correctDetail(q)) : esc([q.answer, ...acceptedList(q)].join(", "))}</div>
                 ${q.page ? `<div style="color:var(--ink-soft);">${esc(pageText(q))}</div>` : ""}
               </div>`).join("")}
           </div>
@@ -2451,11 +2638,12 @@ function renderAdminDashboard(ownerId) {
           <div class="btn-group" data-group="typeMode" style="margin-bottom:8px;">
             <button type="button" class="pill-btn typemode-btn ${draw.typeMode === "ratio" ? "active" : ""}" data-mode="ratio" style="width:auto;padding:10px 16px;">비율 지정</button>
             <button type="button" class="pill-btn typemode-btn ${draw.typeMode === "multipleOnly" ? "active" : ""}" data-mode="multipleOnly" style="width:auto;padding:10px 16px;">객관식만</button>
+            <button type="button" class="pill-btn typemode-btn ${draw.typeMode === "oxOnly" ? "active" : ""}" data-mode="oxOnly" style="width:auto;padding:10px 16px;">O/X만</button>
             <button type="button" class="pill-btn typemode-btn ${draw.typeMode === "essayOnly" ? "active" : ""}" data-mode="essayOnly" style="width:auto;padding:10px 16px;">서술형만</button>
           </div>
           <div id="ratio-row" style="display:${draw.typeMode === "ratio" ? "flex" : "none"};align-items:center;gap:12px;">
             <input type="range" min="0" max="100" step="10" id="ratio-range" value="${draw.multiplePercent}" style="flex:1;accent-color:var(--gold);">
-            <span id="ratio-label" style="font-size:12px;font-weight:600;color:var(--ink-soft);width:150px;text-align:right;">객관식 ${draw.multiplePercent}% / 서술형 ${100 - draw.multiplePercent}%</span>
+            <span id="ratio-label" style="font-size:12px;font-weight:600;color:var(--ink-soft);width:190px;text-align:right;">객관식·O/X ${draw.multiplePercent}% / 서술형 ${100 - draw.multiplePercent}%</span>
           </div>
         </div>
         <button class="btn btn-dark" id="draw-btn" style="width:100%;">추첨하기</button>
@@ -2489,7 +2677,7 @@ function renderAdminDashboard(ownerId) {
     });
     document.getElementById("ratio-range").oninput = (e) => {
       draw.multiplePercent = Number(e.target.value);
-      document.getElementById("ratio-label").textContent = `객관식 ${draw.multiplePercent}% / 서술형 ${100 - draw.multiplePercent}%`;
+      document.getElementById("ratio-label").textContent = `객관식·O/X ${draw.multiplePercent}% / 서술형 ${100 - draw.multiplePercent}%`;
     };
     document.getElementById("draw-btn").onclick = () => {
       const effectiveCount = draw.customCount ? Math.floor(Number(draw.customCount)) : draw.count;
@@ -2603,9 +2791,9 @@ function renderAdminDashboard(ownerId) {
                 <td style="white-space:nowrap;color:${q.page ? "var(--ink)" : "var(--ink-soft)"};">${q.page ? `${esc(q.page)}쪽` : "-"}</td>
                 <td>${esc(q.type)}</td>
                 <td class="truncate q-row-click" data-open="${q.id}" title="눌러서 자세히 보기·수정">${esc(q.question)}</td>
-                <td class="truncate" style="max-width:160px;" title="${esc([q.answer, ...acceptedList(q)].join(", "))}">${esc(q.answer)}${acceptedList(q).length ? ` <span style="font-size:12px;color:var(--ink-soft);">외 ${acceptedList(q).length}개</span>` : ""}</td>
+                <td class="truncate" style="max-width:160px;" title="${esc(isChoiceType(q.type) ? correctDetail(q) : [q.answer, ...acceptedList(q)].join(", "))}">${isChoiceType(q.type) ? `<b>${esc(correctText(q))}</b>${correctList(q).length > 1 ? ` <span style="font-size:12px;color:var(--ink-soft);">복수 정답</span>` : ""}` : `${esc(q.answer)}${acceptedList(q).length ? ` <span style="font-size:12px;color:var(--ink-soft);">외 ${acceptedList(q).length}개</span>` : ""}`}</td>
                 <td style="color:var(--ink-soft);font-size:12px;white-space:nowrap;">${createdAt}</td>
-                <td><span class="badge ${q.isApproved ? "approved" : "pending"}" ${!q.isApproved && q.isImported ? `style="background:#E3EAF3;color:#3A5A86;"` : ""}>${q.isApproved ? "승인" : q.isImported ? "연습용" : "미승인"}</span>${q.isImported ? `<div style="font-size:11px;color:var(--ink-soft);margin-top:3px;white-space:nowrap;">가져옴</div>` : ""}</td>
+                <td><span class="badge ${q.isApproved ? "approved" : "pending"}" ${!q.isApproved && q.isImported ? `style="background:#E3EAF3;color:#3A5A86;"` : ""}>${q.isApproved ? "승인" : q.isImported ? "연습용" : "미승인"}</span>${q.isImported ? `<div style="font-size:11px;color:var(--ink-soft);margin-top:3px;white-space:nowrap;">가져옴</div>` : ""}${q.studentEditedAt && !q.isApproved ? `<div style="font-size:11px;color:var(--gold-deep);font-weight:700;margin-top:3px;white-space:nowrap;">학생이 고침</div>` : ""}</td>
                 <td>
                   <div style="display:flex;gap:6px;">
                     <button class="btn btn-ghost" data-open="${q.id}" style="padding:7px 10px;font-size:12px;white-space:nowrap;">보기·수정</button>
@@ -2647,27 +2835,40 @@ function renderAdminDashboard(ownerId) {
   function openQuestionModal(id) {
     const q = questions.find((x) => x.id === id);
     if (!q) return;
-    const ed = {
-      subject: q.subject || "", unit: q.unit || "", page: q.page || "", type: q.type || QUESTION_TYPES.MULTIPLE,
-      question: q.question || "", answer: q.answer || "", accepted: acceptedList(q).join("\n"),
-      choices: Array.isArray(q.choices) && q.choices.length === CHOICE_COUNT ? [...q.choices] : ["", "", "", ""],
-      correctChoice: q.correctChoice || "",
-    };
+    const ed = { ...questionToForm(q), cls: q.class || "", number: q.number || "", name: q.name || "", renameAll: true };
     const gt = q.gradeTerm || GRADE_TERM;
     const createdAt = q.createdAt?.toDate ? q.createdAt.toDate().toLocaleString("ko-KR") : "-";
     const subjectOptions = [...new Set([...SUBJECTS, ed.subject].filter(Boolean))];
+    const classOptions = [...new Set([...CLASSES, q.class].filter(Boolean))];
+    // 같은 학생(반·번호·이름이 같음)이 낸 다른 문제
+    const sameStudent = questions.filter((x) => x.id !== id && x.class === q.class && String(x.number) === String(q.number) && x.name === q.name);
 
     function paintModal(errMsg = "") {
       const isMultiple = ed.type === QUESTION_TYPES.MULTIPLE;
+      const isOX = ed.type === QUESTION_TYPES.OX;
       const unitOptions = [...new Set([...unitsFor(ed.subject, gt), ed.unit].filter(Boolean))];
       const body = openModal("문제 자세히 보기·수정", `
         <div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--ink-soft);margin-bottom:14px;">
           <span class="badge ${q.isApproved ? "approved" : "pending"}">${q.isApproved ? "승인" : q.isImported ? "연습용" : "미승인"}</span>
-          <span>${esc(q.class)} ${esc(q.number)}번 ${esc(q.name)}, ${esc(createdAt)}</span>
+          <span>${esc(createdAt)}</span>
           ${q.isImported ? `<span>(가져온 문제${q.importedFrom ? `: ${esc(q.importedFrom)}` : ""})</span>` : ""}
-          ${q.editedAt ? `<span>(수정함)</span>` : ""}
+          ${q.editedAt ? `<span>(선생님이 수정함)</span>` : ""}
+          ${q.studentEditedAt ? `<span style="color:var(--gold-deep);font-weight:700;">(학생이 고침${q.studentEditedAt?.toDate ? `: ${esc(q.studentEditedAt.toDate().toLocaleString("ko-KR"))}` : ""})</span>` : ""}
         </div>
         <div style="display:flex;flex-direction:column;gap:12px;">
+          <div style="background:var(--cream);border-radius:10px;padding:10px 12px;">
+            <label class="label" style="font-size:12px;">출제자</label>
+            <div class="grid3" style="grid-template-columns:1fr 80px 1.4fr;">
+              <select class="input" id="m-class" style="padding:9px;font-size:13px;">${classOptions.map((x) => `<option value="${esc(x)}" ${ed.cls === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select>
+              <input class="input" id="m-number" value="${esc(ed.number)}" placeholder="번호" inputmode="numeric" style="padding:9px;font-size:13px;">
+              <input class="input" id="m-name" value="${esc(ed.name)}" placeholder="이름" maxlength="10" style="padding:9px;font-size:13px;">
+            </div>
+            ${sameStudent.length ? `
+            <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:var(--ink-soft);cursor:pointer;">
+              <input type="checkbox" id="m-rename-all" ${ed.renameAll ? "checked" : ""} style="accent-color:var(--board);width:15px;height:15px;">
+              바꾸면 이 학생이 낸 다른 문제 ${sameStudent.length}개도 함께 바꾸기
+            </label>` : ""}
+          </div>
           <div class="grid3" style="grid-template-columns:1fr 1fr 90px;">
             <div><label class="label" style="font-size:12px;">과목</label>
               <select class="input" id="m-subject" style="padding:9px;font-size:13px;">${subjectOptions.map((x) => `<option value="${esc(x)}" ${ed.subject === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></div>
@@ -2677,21 +2878,24 @@ function renderAdminDashboard(ownerId) {
               <input class="input" id="m-page" value="${esc(ed.page)}" placeholder="45~46" style="padding:9px;font-size:13px;"></div>
           </div>
           <div><label class="label" style="font-size:12px;">유형</label>
-            <div class="grid3" style="grid-template-columns:1fr 1fr;">${Object.values(QUESTION_TYPES).map((t) => `<button type="button" class="pill-btn m-type ${ed.type === t ? "active" : ""}" data-type="${t}">${t}</button>`).join("")}</div></div>
+            <div class="grid3">${Object.values(QUESTION_TYPES).map((t) => `<button type="button" class="pill-btn m-type ${ed.type === t ? "active" : ""}" data-type="${t}">${t}</button>`).join("")}</div></div>
           <div><label class="label" style="font-size:12px;">문제</label>
             <textarea class="input" id="m-question" rows="3" style="resize:vertical;">${esc(ed.question)}</textarea></div>
           ${isMultiple ? `
-          <div><label class="label" style="font-size:12px;">보기 (정답 번호를 눌러 고르세요)</label>
+          <div><label class="label" style="font-size:12px;">보기 (정답 번호를 눌러 고르세요 · 여러 개 가능 · 보기는 ${MIN_CHOICES}개 이상)</label>
             <div style="display:flex;flex-direction:column;gap:8px;">
               ${ed.choices.map((c, i) => `
                 <div style="display:flex;gap:8px;align-items:center;">
-                  <button type="button" class="pill-btn m-correct ${ed.correctChoice === String(i + 1) ? "active" : ""}" data-n="${i + 1}" style="width:42px;padding:9px 0;">${i + 1}</button>
-                  <input class="input m-choice" data-i="${i}" value="${esc(c)}" style="padding:9px;font-size:13px;">
+                  <button type="button" class="pill-btn m-correct ${ed.correctChoices.includes(String(i + 1)) ? "active" : ""}" data-n="${i + 1}" style="width:42px;padding:9px 0;">${i + 1}</button>
+                  <input class="input m-choice" data-i="${i}" value="${esc(c)}" placeholder="${i >= MIN_CHOICES ? "(비워 두어도 됨)" : ""}" style="padding:9px;font-size:13px;">
                 </div>`).join("")}
             </div></div>` : ""}
-          <div><label class="label" style="font-size:12px;">${isMultiple ? "정답 설명 (선택)" : "모범 답안"}</label>
+          ${isOX ? `
+          <div><label class="label" style="font-size:12px;">정답</label>
+            <div class="grid3" style="grid-template-columns:1fr 1fr;">${OX_CHOICES.map((c, i) => `<button type="button" class="pill-btn m-ox ${ed.oxAnswer === String(i + 1) ? "active" : ""}" data-n="${i + 1}" style="font-size:22px;font-weight:800;">${c}</button>`).join("")}</div></div>` : ""}
+          <div><label class="label" style="font-size:12px;">${isMultiple || isOX ? "정답 설명 (선택)" : "모범 답안"}</label>
             <textarea class="input" id="m-answer" rows="2" style="resize:vertical;">${esc(ed.answer)}</textarea></div>
-          ${isMultiple ? "" : `<div><label class="label" style="font-size:12px;">정답으로 인정할 답 (한 줄에 하나)</label>
+          ${isMultiple || isOX ? "" : `<div><label class="label" style="font-size:12px;">정답으로 인정할 답 (한 줄에 하나)</label>
             <textarea class="input" id="m-accepted" rows="3" style="resize:vertical;">${esc(ed.accepted)}</textarea></div>`}
           ${errMsg ? `<p class="error-box">${esc(errMsg)}</p>` : ""}
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;">
@@ -2703,6 +2907,10 @@ function renderAdminDashboard(ownerId) {
           </div>
         </div>`);
       const keep = () => {
+        ed.cls = body.querySelector("#m-class").value;
+        ed.number = body.querySelector("#m-number").value;
+        ed.name = body.querySelector("#m-name").value;
+        const ra = body.querySelector("#m-rename-all"); if (ra) ed.renameAll = ra.checked;
         ed.subject = body.querySelector("#m-subject").value;
         ed.unit = body.querySelector("#m-unit").value;
         ed.page = body.querySelector("#m-page").value;
@@ -2713,22 +2921,42 @@ function renderAdminDashboard(ownerId) {
       };
       body.querySelector("#m-subject").onchange = () => { keep(); if (!unitsFor(ed.subject, gt).includes(ed.unit)) ed.unit = ""; paintModal(); };
       body.querySelectorAll(".m-type").forEach((b) => b.onclick = () => { keep(); ed.type = b.dataset.type; paintModal(); });
-      body.querySelectorAll(".m-correct").forEach((b) => b.onclick = () => { keep(); ed.correctChoice = b.dataset.n; paintModal(); });
+      body.querySelectorAll(".m-correct").forEach((b) => b.onclick = () => {
+        keep();
+        const set = new Set(ed.correctChoices);
+        if (set.has(b.dataset.n)) set.delete(b.dataset.n); else set.add(b.dataset.n);
+        ed.correctChoices = [...set].sort(); paintModal();
+      });
+      body.querySelectorAll(".m-ox").forEach((b) => b.onclick = () => { keep(); ed.oxAnswer = b.dataset.n; paintModal(); });
       body.querySelector("#m-save").onclick = async () => {
         keep();
+        const name = ed.name.trim(), number = ed.number.trim();
+        if (!name) return paintModal("출제자 이름을 입력해주세요.");
+        if (name.length > 10) return paintModal("출제자 이름이 너무 깁니다.");
+        if (number && !/^\d{1,3}$/.test(number)) return paintModal("번호는 숫자로 적어주세요.");
         const page = normalizePage(ed.page);
         if (page && !PAGE_PATTERN.test(page)) return paintModal("쪽수는 숫자로 적어주세요. 예: 45 또는 45~46");
         const v = validateQuestion(ed);
         if (!v.valid) return paintModal(v.message);
-        const isMul = ed.type === QUESTION_TYPES.MULTIPLE;
-        const choices = isMul ? ed.choices.map((c) => c.trim()) : [];
+        const cf = buildChoiceFields(ed);
+        const answer = ed.answer.trim() || defaultAnswerFor(ed.type, cf.choices, cf.correctChoices);
+        const author = { class: ed.cls, number: number ? String(Number(number)) : "", name };
+        const authorChanged = author.class !== q.class || author.number !== String(q.number ?? "") || author.name !== q.name;
         const update = {
-          subject: ed.subject, unit: ed.unit, page, type: ed.type, question: ed.question.trim(),
-          answer: ed.answer.trim() || (isMul ? choices[Number(ed.correctChoice) - 1] : ""),
-          acceptedAnswers: isMul ? [] : parseAccepted(ed.accepted).filter((x) => normAnswer(x) !== normAnswer(ed.answer)),
-          choices, correctChoice: isMul ? ed.correctChoice : "", editedAt: serverTimestamp(),
+          ...author,
+          subject: ed.subject, unit: ed.unit, page, type: ed.type, question: ed.question.trim(), answer,
+          acceptedAnswers: ed.type === QUESTION_TYPES.ESSAY ? parseAccepted(ed.accepted).filter((x) => normAnswer(x) !== normAnswer(answer)) : [],
+          ...cf, editedAt: serverTimestamp(),
         };
-        try { await updateDoc(doc(db, COLLECTIONS.QUESTIONS, id), update); closeModal(); showNotice("문제를 수정했습니다."); }
+        try {
+          const others = authorChanged && ed.renameAll ? sameStudent : [];
+          const batch = writeBatch(db);
+          batch.update(doc(db, COLLECTIONS.QUESTIONS, id), update);
+          others.slice(0, 450).forEach((x) => batch.update(doc(db, COLLECTIONS.QUESTIONS, x.id), author));
+          await batch.commit();
+          closeModal();
+          showNotice(others.length ? `문제를 수정하고, 같은 학생의 다른 문제 ${others.length}개의 출제자도 바꿨습니다.` : "문제를 수정했습니다.");
+        }
         catch (err) { console.error(err); paintModal("저장 중 오류가 발생했습니다."); }
       };
       const ap = body.querySelector("#m-approve"); if (ap) ap.onclick = async () => { if (await questionAction(id, "approve")) closeModal(); };
@@ -3164,25 +3392,30 @@ function renderGoldenBellPage() {
   function paintQuestionArea() {
     const settings = getSettings();
     const q = questions[index];
-    const isMultiple = q.type === QUESTION_TYPES.MULTIPLE;
+    const isChoice = isChoiceType(q.type);
+    const isOX = q.type === QUESTION_TYPES.OX;
+    const corrects = correctList(q);
+    const ch = q.choices && q.choices.length ? q.choices : isOX ? OX_CHOICES : [];
+    const autoAnswer = defaultAnswerFor(q.type, ch, corrects);
     const authorLine = authorText(q, settings.revealMode, revealed);
     document.getElementById("gb-question-area").innerHTML = `
       <div class="fade-in" style="width:100%;display:flex;flex-direction:column;align-items:center;">
-        <p class="gb-qnum">문제 ${index + 1}</p>
+        <p class="gb-qnum">문제 ${index + 1}${isOX ? " &nbsp;O/X" : ""}</p>
         <p class="gb-question">${esc(q.question)}</p>
-        ${isMultiple ? `
-        <div class="gb-choices">
-          ${(q.choices || []).map((c, i) => `
-            <div class="gb-choice ${revealed && String(i + 1) === q.correctChoice ? "correct pop" : ""}">
+        ${isChoice ? `
+        <div class="gb-choices ${isOX ? "ox" : ""}">
+          ${ch.map((c, i) => `
+            <div class="gb-choice ${revealed && corrects.includes(String(i + 1)) ? "correct pop" : ""}">
               <span class="gb-choice-idx">${i + 1}</span>${esc(c)}
             </div>`).join("")}
         </div>` : ""}
         ${!revealed
           ? `<button class="gb-reveal-btn" id="reveal-btn">정답 보기</button>`
           : `<div class="gb-answer-card reveal">
-               <p class="gb-answer-label">정답</p>
-               ${isMultiple
-                 ? `<p class="gb-answer-text">${esc(q.correctChoice)}번 &nbsp; <span style="font-size:.7em;font-weight:700;margin-left:.3em;">${esc((q.choices || [])[Number(q.correctChoice) - 1] || "")}</span></p>`
+               <p class="gb-answer-label">정답${corrects.length > 1 ? " (복수 정답, 하나만 맞혀도 정답)" : ""}</p>
+               ${isChoice
+                 ? `<p class="gb-answer-text">${isOX ? esc(correctText(q)) : corrects.map((n) => `${esc(n)}번 <span style="font-size:.7em;font-weight:700;margin-left:.2em;">${esc(ch[Number(n) - 1] || "")}</span>`).join(`<span style="opacity:.45;margin:0 .45em;">·</span>`)}</p>
+                    ${q.answer && q.answer !== autoAnswer ? `<p class="gb-accepted" style="white-space:pre-wrap;"><b>설명</b> ${esc(q.answer)}</p>` : ""}`
                  : `<p class="gb-answer-text">${esc(q.answer)}</p>
                     ${acceptedList(q).length ? `<p class="gb-accepted"><b>이것도 정답</b> ${acceptedList(q).map(esc).join(", ")}</p>` : ""}`}
                ${q.page ? `<p style="margin:.4em 0 0;font-size:.8em;font-weight:700;opacity:.8;">${esc(pageText(q))}</p>` : ""}
