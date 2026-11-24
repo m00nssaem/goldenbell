@@ -589,16 +589,45 @@ function isSpecialCharOnly(text) {
 /* ---------------- 맞춤법 검사 (자주 틀리는 말) ----------------
    인터넷 맞춤법 검사기는 학교 사이트에서 바로 부를 수 없어서, 초등학생이 자주 틀리는 말을 직접 모아 둠.
    fix가 null이면 고칠 말을 정하지 않고 알려 주기만 함 */
+// 한글 글자의 받침 번호 (0 = 받침 없음, 4 = ㄴ, 8 = ㄹ)
+function jong(ch) { const c = String(ch || "").charCodeAt(0) - 0xAC00; return c >= 0 && c < 11172 ? c % 28 : -1; }
 const SPELL_RULES = [
+  { re: /안\s?되요/g, fix: "안 돼요", why: "'안 되어요'를 줄이면 '안 돼요'예요." },
+  { re: /됀/g, fix: "된", why: "'됀'은 없는 글자예요." },
+  { re: /무었/g, fix: "무엇", why: "'무엇'이 맞아요." },
+  { re: /담구/g, fix: "담그", why: "'담그다'가 맞아요. 예) 김치를 담가요" },
+  { re: /잠구/g, fix: "잠그", why: "'잠그다'가 맞아요. 예) 문을 잠가요" },
+  { re: /담궈/g, fix: "담가", why: "'담그다'는 '담가'로 바뀌어요." },
+  { re: /잠궈/g, fix: "잠가", why: "'잠그다'는 '잠가'로 바뀌어요." },
+  { re: /설레임/g, fix: "설렘", why: "'설레다'에서 온 말이라 '설렘'이에요." },
+  { re: /(피|되|띄|쉬)였/g, fix: "$1었", why: "'-였'이 아니라 '-었'을 써요. 예) 피었다, 되었다" },
+  { re: /윗층/g, fix: "위층", why: "뒷말이 된소리·거센소리(ㅊ)면 사이시옷을 쓰지 않아요." },
+  { re: /윗쪽/g, fix: "위쪽", why: "뒷말이 된소리(ㅉ)면 사이시옷을 쓰지 않아요." },
+  { re: /숫가락/g, fix: "숟가락", why: "'숟가락'이 맞아요." },
+  { re: /나무가지/g, fix: "나뭇가지", why: "'나뭇가지'가 맞아요." },
+  { re: /등교길/g, fix: "등굣길", why: "'등굣길'이 맞아요." },
+  { re: /하교길/g, fix: "하굣길", why: "'하굣길'이 맞아요." },
+  { re: /돐/g, fix: "돌", why: "'돌'이 맞아요. 예) 돌잔치" },
+  { re: /일부로/g, fix: "일부러", why: "'일부러'가 맞아요." },
+  { re: /(병이|감기가|상처가)\s?낳/g, fix: "$1 나", why: "병이 좋아지는 것은 '낫다'예요. ('낳다'는 아기를 낳을 때)" },
+  { re: /(할|갈|볼|줄|쓸|먹을)려고/g, fix: (m, a) => ({ "할": "하", "갈": "가", "볼": "보", "줄": "주", "쓸": "쓰", "먹을": "먹으" }[a]) + "려고", why: "'-려고'가 맞아요. 예) 하려고, 가려고" },
+  // 받침이 ㄹ인 글자 뒤의 '께' → '게' (할께 → 할게). '선생님께', '할머니께서'는 그대로
+  { re: /([가-힣])께(?=요|[\s.,!?]|$)/g, when: (m) => jong(m[1]) === 8, fix: "$1게", why: "'-ㄹ게'는 '께'가 아니라 '게'로 써요. 예) 할게요" },
+  // '것·수·때·줄'은 앞말과 띄어 써요 (만든것 → 만든 것, 할수 있다 → 할 수 있다)
+  { re: /([가-힣])것/g, when: (m) => [4, 8].includes(jong(m[1])) && !["날", "탈", "별", "들", "산"].includes(m[1]), fix: "$1 것", why: "'것'은 앞말과 띄어 써요. 예) 만든 것" },
+  { re: /([가-힣])수(?!록)(?=\s?(있|없|가|도|는|밖))/g, when: (m) => jong(m[1]) === 8, fix: "$1 수", why: "'-ㄹ 수 있다/없다'의 '수'는 띄어 써요." },
+  { re: /([가-힣])때(?=[\s가-힣.,!?]|$)/g, when: (m) => jong(m[1]) === 8 && m[1] !== "물", fix: "$1 때", why: "'때'는 앞말과 띄어 써요. 예) 할 때" },
+  { re: /([가-힣])줄(?=\s?(알|몰))/g, when: (m) => jong(m[1]) === 8, fix: "$1 줄", why: "'-ㄹ 줄 알다/모르다'의 '줄'은 띄어 써요." },
+  // '이다'는 앞말에 붙여 써요 (사과 입니다 → 사과입니다, 무엇 일까요 → 무엇일까요)
+  { re: /([가-힣0-9])\s+(입니다|입니까|인가요|일까요|이에요|예요|일까|인가|이다|이었다|였다)(?=$|[\s.,!?])/g, fix: "$1$2", why: "'-이다(입니다, 일까요 등)'는 앞말에 붙여 써요. 예) 무엇일까요" },
   { re: /됬/g, fix: "됐", why: "'됬'은 없는 글자예요. '되었'을 줄이면 '됐'이에요." },
   { re: /되요/g, fix: "돼요", why: "'되어요'를 줄이면 '돼요'예요." },
   { re: /되서/g, fix: "돼서", why: "'되어서'를 줄이면 '돼서'예요." },
   { re: /되도/g, fix: "돼도", why: "'되어도'를 줄이면 '돼도'예요." },
   { re: /됄/g, fix: "될", why: "'됄'은 없는 글자예요." },
-  { re: /않\s?(되|돼)/g, fix: "안 $1", why: "'아니'를 줄인 말은 '안'이에요. (않 = 아니하)" },
+  { re: /않\s?(되|돼|된|될)/g, fix: "안 $1", why: "'아니'를 줄인 말은 '안'이에요. (않 = 아니하)" },
   { re: /않\s?(해|하|가|와|먹|보|나|써)/g, fix: "안 $1", why: "'아니'를 줄인 말은 '안'이에요. (않 = 아니하)" },
   { re: /안(되|돼)(?![었])/g, fix: "안 $1", why: "'안 되다'는 띄어 써요." },
-  { re: /(할|줄|볼|갈|올|될|칠|살|쓸|만들|읽을|먹을|도와줄|알려줄)께/g, fix: "$1게", why: "'-ㄹ게'는 '께'가 아니라 '게'로 써요." },
   { re: /몇\s?일/g, fix: "며칠", why: "'몇 일'이 아니라 '며칠'이 맞아요." },
   { re: /금새/g, fix: "금세", why: "'금시에'를 줄인 말이라 '금세'예요." },
   { re: /역활/g, fix: "역할", why: "'역할'이 맞아요." },
@@ -623,7 +652,6 @@ const SPELL_RULES = [
   { re: /(답을|정답을|문제를)\s?맞추/g, fix: "$1 맞히", why: "정답을 알아내는 것은 '맞히다'예요. ('맞추다'는 서로 비교하거나 짝을 맞출 때)" },
   { re: /가르키/g, fix: null, why: "'가르치다'(알려 주다)나 '가리키다'(손가락으로 짚다) 중 하나로 고쳐요." },
   { re: /읍니다/g, fix: "습니다", why: "'-습니다'가 맞아요." },
-  { re: /(할|볼|갈|먹을|알|될|살|쓸|읽을|만들|풀|찾을|할)수(?!록)/g, fix: "$1 수", why: "'-ㄹ 수 있다/없다'의 '수'는 띄어 써요." },
   { re: /것같/g, fix: "것 같", why: "'것 같다'는 띄어 써요." },
   { re: /거같/g, fix: "거 같", why: "'거 같다'는 띄어 써요." },
   { re: /(한|두|세|네|몇)(개|명|마리|권|살)(?=$|[^가-힣]|[의는를을가이도만씩와과])/g, fix: "$1 $2", why: "세는 말(개, 명, 마리 등)은 앞말과 띄어 써요. 예) 두 개" },
@@ -631,6 +659,10 @@ const SPELL_RULES = [
   { re: / {2,}/g, fix: " ", why: "띄어쓰기가 두 칸 이상 들어 있어요." },
   { re: /([?!.])\1+/g, fix: "$1", why: "문장부호가 여러 개 겹쳐 있어요." },
 ];
+// 찾은 글자(m)에 고칠 말을 적용 ($1, $2는 괄호로 묶은 부분)
+function spellExpand(rule, m) {
+  return typeof rule.fix === "function" ? rule.fix(...m) : rule.fix.replace(/\$(\d)/g, (_, n) => m[Number(n)] ?? "");
+}
 // text에서 찾은 틀린 곳 목록 [{ ruleIdx, wrong, right, why, index }]
 function spellCheck(text, isQuestion = false) {
   const t = String(text || "");
@@ -639,7 +671,8 @@ function spellCheck(text, isQuestion = false) {
     if (rule.endQ && !isQuestion) return; // 물음표 검사는 '문제' 칸에서만
     rule.re.lastIndex = 0;
     for (const m of t.matchAll(rule.re)) {
-      const right = rule.endQ ? `${m[0].trimEnd()}?` : rule.fix === null ? "" : m[0].replace(new RegExp(rule.re.source), rule.fix);
+      if (rule.when && !rule.when(m)) continue;
+      const right = rule.endQ ? `${m[0].trimEnd()}?` : rule.fix === null ? "" : spellExpand(rule, m);
       out.push({ ruleIdx, wrong: m[0], right, why: rule.why, index: m.index, fixable: rule.endQ || rule.fix !== null });
     }
   });
@@ -654,7 +687,13 @@ function spellFixAll(text, isQuestion = false) {
   SPELL_RULES.forEach((rule) => {
     if (rule.endQ && !isQuestion) return;
     if (rule.endQ) { rule.re.lastIndex = 0; t = t.replace(rule.re, (m) => `${m.trimEnd()}?`); }
-    else if (rule.fix !== null) t = t.replace(rule.re, rule.fix);
+    else if (rule.fix !== null) {
+      t = t.replace(rule.re, (...args) => {
+        const m = args.slice(0, -2); // [전체, 그룹1, 그룹2...]
+        if (rule.when && !rule.when(m)) return m[0];
+        return spellExpand(rule, m);
+      });
+    }
   });
   return t;
 }
@@ -1542,6 +1581,16 @@ function renderStudentPage(ownerId) {
         removeKey(draftKey); error = ""; paintStep();
       };
       document.getElementById("spell-btn").onclick = () => { spellShown = true; error = ""; paintStep(); };
+      // 글을 쓰는 동안 틀린 곳 수를 버튼에 바로 보여 줌
+      const updateSpellBtn = () => {
+        const btn = document.getElementById("spell-btn"); if (!btn) return;
+        const n = spellCheckFields(draftSpellFields()).length;
+        btn.textContent = n ? `맞춤법 확인할 곳 ${n}개 · 눌러서 보기` : "맞춤법 검사하기";
+        btn.style.background = n ? "#FFF1C9" : ""; btn.style.color = n ? "#7E5C0E" : "";
+      };
+      ["q-input", "a-input", "acc-input"].forEach((idName) => document.getElementById(idName)?.addEventListener("input", updateSpellBtn));
+      document.querySelectorAll(".choice-input").forEach((inp) => inp.addEventListener("input", updateSpellBtn));
+      updateSpellBtn();
       const spIssues = spellShown ? spellCheckFields(draftSpellFields()) : [];
       document.querySelectorAll("[data-sp-i]").forEach((b) => b.onclick = () => {
         const x = spIssues[Number(b.dataset.spI)];
