@@ -95,6 +95,11 @@
   .modal-head h3{ margin:0; font-size:17px; font-weight:800; }
   .modal-x{ background:none; font-size:20px; color:var(--ink-soft); padding:4px 8px; }
   .q-row-click{ cursor:pointer; }
+  .spell-box{ background:#FFF8E6; border:1px solid #EBD592; border-radius:10px; padding:10px 12px; font-size:13px; color:var(--ink); text-align:left; }
+  .spell-box.ok{ background:var(--green-soft); border-color:#BFDCC8; color:var(--green); font-weight:700; }
+  .spell-row{ display:flex; align-items:center; gap:8px; padding:6px 0; border-top:1px dashed #EBD592; }
+  .sp-wrong{ color:var(--red); text-decoration:line-through; font-weight:700; }
+  .sp-right{ color:var(--green); font-weight:800; }
   .sim-badge{ display:inline-block; background:#F5E7BC; color:#7E5C0E; border-radius:99px; padding:1px 7px; font-size:11px; font-weight:800; margin-right:6px; text-decoration:none; }
   .q-row-click:hover{ text-decoration:underline; }
   /* 큰 화면(전자칠판·큰 모니터)에서는 관리자·학생 화면 전체를 비율대로 키움 */
@@ -514,6 +519,7 @@ const COLLECTIONS = {
   SUBMIT_COUNTS: "submitCounts", // 학생별 제출 횟수 (1인당 최대 문제 수 제한용)
   ADMIN_UIDS: "adminUids",       // 로그인 계정(uid) → 아이디 연결 (구글 로그인용)
   LINK_INVITES: "linkInvites",   // 다른 구글 계정을 같은 아이디에 합류시키는 1회용 연결 코드
+  QUESTION_LOCKS: "questionLocks", // 선생님이 고친 문제 표시 + 고친 내용 (문서 ID = 문제 ID, 학생은 더 고칠 수 없음)
   FEEDBACKS: "feedbacks",        // 선생님이 학생 문제에 남긴 한마디 (문서 ID = 문제 ID, 문제를 낸 학생만 ID를 앎)
 };
 // 학생 한 명을 구분하는 키 (반·번호·이름). 문서 ID에 '/'가 들어가지 않도록 인코딩
@@ -578,6 +584,112 @@ function isSpecialCharOnly(text) {
   const cleaned = text.replace(/\s/g, "");
   if (!cleaned) return true;
   return !/[가-힣a-zA-Z0-9]/.test(cleaned);
+}
+
+/* ---------------- 맞춤법 검사 (자주 틀리는 말) ----------------
+   인터넷 맞춤법 검사기는 학교 사이트에서 바로 부를 수 없어서, 초등학생이 자주 틀리는 말을 직접 모아 둠.
+   fix가 null이면 고칠 말을 정하지 않고 알려 주기만 함 */
+const SPELL_RULES = [
+  { re: /됬/g, fix: "됐", why: "'됬'은 없는 글자예요. '되었'을 줄이면 '됐'이에요." },
+  { re: /되요/g, fix: "돼요", why: "'되어요'를 줄이면 '돼요'예요." },
+  { re: /되서/g, fix: "돼서", why: "'되어서'를 줄이면 '돼서'예요." },
+  { re: /되도/g, fix: "돼도", why: "'되어도'를 줄이면 '돼도'예요." },
+  { re: /됄/g, fix: "될", why: "'됄'은 없는 글자예요." },
+  { re: /않\s?(되|돼)/g, fix: "안 $1", why: "'아니'를 줄인 말은 '안'이에요. (않 = 아니하)" },
+  { re: /않\s?(해|하|가|와|먹|보|나|써)/g, fix: "안 $1", why: "'아니'를 줄인 말은 '안'이에요. (않 = 아니하)" },
+  { re: /안(되|돼)(?![었])/g, fix: "안 $1", why: "'안 되다'는 띄어 써요." },
+  { re: /(할|줄|볼|갈|올|될|칠|살|쓸|만들|읽을|먹을|도와줄|알려줄)께/g, fix: "$1게", why: "'-ㄹ게'는 '께'가 아니라 '게'로 써요." },
+  { re: /몇\s?일/g, fix: "며칠", why: "'몇 일'이 아니라 '며칠'이 맞아요." },
+  { re: /금새/g, fix: "금세", why: "'금시에'를 줄인 말이라 '금세'예요." },
+  { re: /역활/g, fix: "역할", why: "'역할'이 맞아요." },
+  { re: /설겆이/g, fix: "설거지", why: "'설거지'가 맞아요." },
+  { re: /희안/g, fix: "희한", why: "'희한하다'가 맞아요." },
+  { re: /오랫만/g, fix: "오랜만", why: "'오래간만'을 줄인 말이라 '오랜만'이에요." },
+  { re: /일일히/g, fix: "일일이", why: "'일일이'가 맞아요." },
+  { re: /깨끗히/g, fix: "깨끗이", why: "'깨끗이'가 맞아요." },
+  { re: /곰곰히/g, fix: "곰곰이", why: "'곰곰이'가 맞아요." },
+  { re: /틈틈히/g, fix: "틈틈이", why: "'틈틈이'가 맞아요." },
+  { re: /꼼꼼이/g, fix: "꼼꼼히", why: "'꼼꼼히'가 맞아요." },
+  { re: /솔직이/g, fix: "솔직히", why: "'솔직히'가 맞아요." },
+  { re: /어의\s?없/g, fix: "어이없", why: "'어이없다'가 맞아요." },
+  { re: /구지/g, fix: "굳이", why: "'굳이'가 맞아요." },
+  { re: /왠만/g, fix: "웬만", why: "'웬만하다'가 맞아요." },
+  { re: /왠일/g, fix: "웬일", why: "'웬일'이 맞아요." },
+  { re: /웬지/g, fix: "왠지", why: "'왜인지'를 줄인 말이라 '왠지'예요." },
+  { re: /뵈요/g, fix: "봬요", why: "'뵈어요'를 줄이면 '봬요'예요." },
+  { re: /어떻해/g, fix: "어떡해", why: "'어떻게 해'를 줄인 말은 '어떡해'예요." },
+  { re: /예기(?!치)/g, fix: "얘기", why: "'이야기'를 줄인 말은 '얘기'예요." },
+  { re: /바램/g, fix: "바람", why: "'바라다'에서 온 말이라 '바람'이에요." },
+  { re: /(답을|정답을|문제를)\s?맞추/g, fix: "$1 맞히", why: "정답을 알아내는 것은 '맞히다'예요. ('맞추다'는 서로 비교하거나 짝을 맞출 때)" },
+  { re: /가르키/g, fix: null, why: "'가르치다'(알려 주다)나 '가리키다'(손가락으로 짚다) 중 하나로 고쳐요." },
+  { re: /읍니다/g, fix: "습니다", why: "'-습니다'가 맞아요." },
+  { re: /(할|볼|갈|먹을|알|될|살|쓸|읽을|만들|풀|찾을|할)수(?!록)/g, fix: "$1 수", why: "'-ㄹ 수 있다/없다'의 '수'는 띄어 써요." },
+  { re: /것같/g, fix: "것 같", why: "'것 같다'는 띄어 써요." },
+  { re: /거같/g, fix: "거 같", why: "'거 같다'는 띄어 써요." },
+  { re: /(한|두|세|네|몇)(개|명|마리|권|살)(?=$|[^가-힣]|[의는를을가이도만씩와과])/g, fix: "$1 $2", why: "세는 말(개, 명, 마리 등)은 앞말과 띄어 써요. 예) 두 개" },
+  { re: /(까요|나요|니까|는가|인가|일까|은|는|무엇|누구|언제|어디)\s*$/g, fix: null, why: "묻는 문장 같아요. 끝에 물음표(?)를 붙여 볼까요?", endQ: true },
+  { re: / {2,}/g, fix: " ", why: "띄어쓰기가 두 칸 이상 들어 있어요." },
+  { re: /([?!.])\1+/g, fix: "$1", why: "문장부호가 여러 개 겹쳐 있어요." },
+];
+// text에서 찾은 틀린 곳 목록 [{ ruleIdx, wrong, right, why, index }]
+function spellCheck(text, isQuestion = false) {
+  const t = String(text || "");
+  const out = [];
+  SPELL_RULES.forEach((rule, ruleIdx) => {
+    if (rule.endQ && !isQuestion) return; // 물음표 검사는 '문제' 칸에서만
+    rule.re.lastIndex = 0;
+    for (const m of t.matchAll(rule.re)) {
+      const right = rule.endQ ? `${m[0].trimEnd()}?` : rule.fix === null ? "" : m[0].replace(new RegExp(rule.re.source), rule.fix);
+      out.push({ ruleIdx, wrong: m[0], right, why: rule.why, index: m.index, fixable: rule.endQ || rule.fix !== null });
+    }
+  });
+  // 겹치는 곳은 앞의 것만 (하나를 고치면 다시 검사함)
+  out.sort((a, b) => a.index - b.index || b.wrong.length - a.wrong.length);
+  let end = -1;
+  return out.filter((x) => { if (x.index < end) return false; end = x.index + x.wrong.length; return true; });
+}
+// 고칠 수 있는 곳을 한꺼번에 고침
+function spellFixAll(text, isQuestion = false) {
+  let t = String(text || "");
+  SPELL_RULES.forEach((rule) => {
+    if (rule.endQ && !isQuestion) return;
+    if (rule.endQ) { rule.re.lastIndex = 0; t = t.replace(rule.re, (m) => `${m.trimEnd()}?`); }
+    else if (rule.fix !== null) t = t.replace(rule.re, rule.fix);
+  });
+  return t;
+}
+// 한 곳만 고침
+function spellFixOne(text, issue) {
+  const t = String(text || "");
+  if (t.slice(issue.index, issue.index + issue.wrong.length) !== issue.wrong) return t;
+  return t.slice(0, issue.index) + issue.right + t.slice(issue.index + issue.wrong.length);
+}
+// fields: [{ key, label, text }] → 칸마다 검사한 결과를 하나로 모음
+function spellCheckFields(fields) {
+  const out = [];
+  fields.forEach((f) => spellCheck(f.text, f.key === "question").forEach((is) => out.push({ ...is, key: f.key, label: f.label })));
+  return out;
+}
+function spellPanelHTML(issues, { checked = true } = {}) {
+  if (!checked) return "";
+  if (!issues.length) return `<div class="spell-box ok">맞춤법이 틀린 곳을 찾지 못했어요. (자주 틀리는 말만 찾아 줘요)</div>`;
+  const fixable = issues.filter((x) => x.fixable).length;
+  return `<div class="spell-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+      <b style="font-size:13px;">맞춤법을 확인해 보세요 (${issues.length}곳)</b>
+      ${fixable > 1 ? `<button type="button" class="btn btn-gold" data-sp-all="1" style="padding:5px 10px;font-size:12px;">모두 고치기</button>` : ""}
+    </div>
+    ${issues.map((x, i) => `
+      <div class="spell-row">
+        <div style="flex:1;min-width:0;">
+          <span style="font-size:11px;color:var(--ink-soft);font-weight:700;">${esc(x.label)}</span>
+          <div><span class="sp-wrong">${esc(x.wrong.trim() || "(빈칸)")}</span>${x.fixable ? ` → <span class="sp-right">${esc(x.right.trim() || "(빈칸)")}</span>` : ""}</div>
+          <div style="font-size:12px;color:var(--ink-soft);">${esc(x.why)}</div>
+        </div>
+        ${x.fixable ? `<button type="button" class="btn btn-ghost" data-sp-i="${i}" style="flex-shrink:0;padding:5px 10px;font-size:12px;background:#fff;">고치기</button>` : ""}
+      </div>`).join("")}
+    <p style="margin:6px 0 0;font-size:11px;color:var(--ink-soft);">자주 틀리는 말만 찾아 줘요. 다른 곳도 한 번 더 읽어 보세요.</p>
+  </div>`;
 }
 
 /* ---------------- 검증 ---------------- */
@@ -958,19 +1070,45 @@ function renderStudentPage(ownerId) {
   let maxPerStudent = 0;      // 0 = 제한 없음
   let serverCount = null;     // 서버에 기록된 이 학생의 제출 횟수 (모르면 null)
   let feedbackMap = {};       // 문제 ID → 선생님 한마디 { message, at(ms) }
+  let lockMap = {};           // 문제 ID → 선생님이 고친 내용 { at(ms), data } (이 문제는 학생이 더 못 고침)
+  // ---- 맞춤법 검사 ----
+  let spellShown = false, spellAckKey = null;
+  function draftSpellFields() {
+    const f = [{ key: "question", label: "문제", text: draft.question }];
+    if (draft.type === QUESTION_TYPES.MULTIPLE) draft.choices.forEach((c, i) => f.push({ key: `choice${i}`, label: `보기 ${i + 1}`, text: c }));
+    f.push({ key: "answer", label: draft.type === QUESTION_TYPES.ESSAY ? "모범 답안" : "정답 설명", text: draft.answer });
+    if (draft.type === QUESTION_TYPES.ESSAY && !draft.noAccepted) f.push({ key: "accepted", label: "인정할 답", text: draft.accepted });
+    return f;
+  }
+  function setDraftField(key, val) {
+    if (key === "question") draft.question = val;
+    else if (key.startsWith("choice")) draft.choices[Number(key.slice(6))] = val;
+    else if (key === "answer") draft.answer = val;
+    else if (key === "accepted") draft.accepted = val;
+    saveJSON(draftKey, draft);
+  }
   // 내가 낸 문제에 선생님이 남긴 한마디를 불러옴 (최근 40개 문제)
   async function loadFeedbacks() {
     const ids = myHistory().filter((h) => h.id).slice(-40).map((h) => h.id);
     if (!ids.length) return;
-    const next = {};
+    const next = {}, nextLocks = {};
     await Promise.all(ids.map(async (id) => {
       try {
         const snap = await getDoc(doc(db, COLLECTIONS.FEEDBACKS, id));
         if (snap.exists() && snap.data().message) next[id] = { message: snap.data().message, at: snap.data().at?.toMillis?.() || 0 };
       } catch (e) {}
+      try {
+        const ls = await getDoc(doc(db, COLLECTIONS.QUESTION_LOCKS, id));
+        if (ls.exists()) nextLocks[id] = { at: ls.data().at?.toMillis?.() || 0, data: ls.data().data || null };
+      } catch (e) {}
     }));
-    if (JSON.stringify(next) === JSON.stringify(feedbackMap)) return;
-    feedbackMap = next;
+    if (JSON.stringify([next, nextLocks]) === JSON.stringify([feedbackMap, lockMap])) return;
+    feedbackMap = next; lockMap = nextLocks;
+    // 고치던 문제를 선생님이 고쳤으면 고치기를 멈춤
+    if (draft.editingId && lockMap[draft.editingId] && step === "question") {
+      draft = { ...emptyQuestion(), subject: draft.subject, type: draft.type }; removeKey(draftKey);
+      error = "선생님이 이미 고친 문제라 더 고칠 수 없어요."; paintStep(); return;
+    }
     if (step === "question" || step === "success") {
       // 입력 중인 칸이 있으면 커서가 사라지지 않도록, 목록 부분만 다시 그림
       const box = document.getElementById("my-qs-box");
@@ -979,7 +1117,7 @@ function renderStudentPage(ownerId) {
     }
   }
   // 선생님 한마디가 있고, 그 뒤에 아직 고치지 않았는지
-  const pendingFeedback = (h) => { const f = h.id && feedbackMap[h.id]; return !!(f && !(h.editedAt && h.editedAt > f.at)); };
+  const pendingFeedback = (h) => { const f = h.id && feedbackMap[h.id]; return !!(f && !(h.editedAt && h.editedAt > f.at) && !(lockMap[h.id] && lockMap[h.id].at >= f.at)); };
   async function refreshServerCount() {
     try {
       const snap = await getDoc(doc(db, COLLECTIONS.SUBMIT_COUNTS, submitCountKey(ownerId, studentInfo)));
@@ -1012,7 +1150,9 @@ function renderStudentPage(ownerId) {
     const i = list.findIndex((h) => h.id === id);
     if (i >= 0) { list[i] = { ...list[i], ...patch }; saveJSON(historyKey, list); }
   }
-  const canEdit = (h) => !!(h && h.id && h.token && h.data);
+  const hasToken = (h) => !!(h && h.id && h.token && h.data);
+  const isLocked = (h) => !!(h && h.id && lockMap[h.id]);
+  const canEdit = (h) => hasToken(h) && !isLocked(h);
   // 내가 낸 문제 하나의 전체 내용 (문제·보기·정답)
   function feedbackBoxHTML(h) {
     const f = h.id && feedbackMap[h.id];
@@ -1026,10 +1166,11 @@ function renderStudentPage(ownerId) {
     </div>`;
   }
   function historyDetailHTML(h) {
-    return feedbackBoxHTML(h) + historyDetailInnerHTML(h);
+    const lockNote = isLocked(h) ? `<div style="background:var(--gold-soft);border-radius:10px;padding:8px 12px;margin:6px 0 0;font-size:12px;font-weight:700;color:var(--gold-deep);">선생님이 고친 문제예요. 아래는 선생님이 고친 내용이고, 이제 더 고칠 수 없어요.</div>` : "";
+    return feedbackBoxHTML(h) + lockNote + historyDetailInnerHTML(h);
   }
   function historyDetailInnerHTML(h) {
-    const d = h.data;
+    const d = (isLocked(h) && lockMap[h.id].data) || h.data;
     if (!d) return `<div class="hist-detail"><p style="margin:0;white-space:pre-wrap;">${esc(h.preview)}</p>
       <p style="margin:6px 0 0;font-size:12px;color:var(--ink-soft);">이 문제는 예전 방식으로 낸 문제라 이 기기에 앞부분만 기록되어 있어요. 전체 문제와 정답은 선생님께 여쭤봐요.</p></div>`;
     const corrects = correctList(d);
@@ -1061,8 +1202,9 @@ function renderStudentPage(ownerId) {
                 <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft);">
                   <span style="flex-shrink:0;font-weight:700;color:var(--gold-deep);">${items.length - i}.</span>
                   <span style="flex-shrink:0;background:#fff;border-radius:99px;padding:1px 8px;font-size:12px;font-weight:700;color:var(--ink);">${esc(h.unit ? `${h.subject} ${h.unit}` : h.subject)}${h.page ? ` ${esc(h.page)}쪽` : ""}</span>
-                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${pendingFeedback(h) ? `<b style="color:#fff;background:var(--red);border-radius:99px;padding:0 6px;font-size:11px;font-weight:800;">한마디</b> ` : ""}${h.editedAt ? `<b style="color:var(--green);font-weight:700;">고침</b> ` : ""}${esc(h.preview)}</span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${pendingFeedback(h) ? `<b style="color:#fff;background:var(--red);border-radius:99px;padding:0 6px;font-size:11px;font-weight:800;">한마디</b> ` : ""}${h.editedAt ? `<b style="color:var(--green);font-weight:700;">고침</b> ` : ""}${esc(isLocked(h) && lockMap[h.id].data?.question ? (lockMap[h.id].data.question.length > 30 ? lockMap[h.id].data.question.slice(0, 30) + "..." : lockMap[h.id].data.question) : h.preview)}</span>
                   ${canEdit(h) ? `<button type="button" class="hist-edit" data-edit-id="${esc(h.id)}">고치기</button>`
+                    : isLocked(h) ? `<span style="flex-shrink:0;font-size:11px;font-weight:700;color:var(--gold-deep);" title="선생님이 고친 문제는 더 고칠 수 없어요">선생님이 고침</span>`
                     : `<span style="flex-shrink:0;font-size:11px;color:#9AA39E;" title="고치기 기능이 생기기 전에 낸 문제예요">고칠 수 없음</span>`}
                   <span class="hist-caret">▼</span>
                 </div>
@@ -1071,7 +1213,7 @@ function renderStudentPage(ownerId) {
             </details>`).join("")}
         </div>
         ${editable ? `<p style="font-size:12px;color:var(--ink-soft);margin:8px 0 0;">문제를 고치면 선생님이 다시 확인한 뒤 골든벨에 나와요.</p>` : ""}
-        ${items.some((h) => !canEdit(h)) ? `<p style="font-size:12px;color:var(--ink-soft);margin:4px 0 0;">'고칠 수 없음'은 고치기 기능이 생기기 전에 낸 문제예요. 고치려면 선생님께 말씀드려요.</p>` : ""}
+        ${items.some((h) => !hasToken(h)) ? `<p style="font-size:12px;color:var(--ink-soft);margin:4px 0 0;">'고칠 수 없음'은 고치기 기능이 생기기 전에 낸 문제예요. 고치려면 선생님께 말씀드려요.</p>` : ""}
       </div>`;
   }
   // '내가 낸 문제' 칸 (선생님 한마디가 오면 이 칸만 다시 그림)
@@ -1092,6 +1234,7 @@ function renderStudentPage(ownerId) {
     const h = myHistory().find((x) => x.id === id);
     if (!canEdit(h)) return;
     draft = { ...emptyQuestion(), ...questionToForm(h.data), editingId: id };
+    spellShown = false; spellAckKey = null;
     saveJSON(draftKey, draft);
     step = "question"; error = ""; paintDots(); paintStep(); window.scrollTo(0, 0);
   }
@@ -1251,7 +1394,7 @@ function renderStudentPage(ownerId) {
           </div>
           <div>
             <label class="label">문제</label>
-            <textarea class="input" id="q-input" rows="3" placeholder="문제를 입력하세요" style="resize:vertical;">${esc(draft.question)}</textarea>
+            <textarea class="input" id="q-input" spellcheck="true" lang="ko" rows="3" placeholder="문제를 입력하세요" style="resize:vertical;">${esc(draft.question)}</textarea>
           </div>
           ${isMultiple ? `
           <div>
@@ -1261,7 +1404,7 @@ function renderStudentPage(ownerId) {
               ${Array.from({ length: CHOICE_COUNT }).map((_, i) => `
                 <div class="choice-row">
                   <button type="button" class="choice-mark correct-btn ${draft.correctChoices.includes(String(i + 1)) ? "active" : ""}" data-idx="${i + 1}" title="${i + 1}번을 정답으로">${i + 1}</button>
-                  <input class="input choice-input" data-idx="${i}" type="text" placeholder="보기 ${i + 1}${i >= MIN_CHOICES ? " (안 써도 돼요)" : ""}" value="${esc(draft.choices[i] || "")}">
+                  <input class="input choice-input" data-idx="${i}" type="text" spellcheck="true" lang="ko" placeholder="보기 ${i + 1}${i >= MIN_CHOICES ? " (안 써도 돼요)" : ""}" value="${esc(draft.choices[i] || "")}">
                 </div>`).join("")}
             </div>
           </div>` : ""}
@@ -1274,13 +1417,13 @@ function renderStudentPage(ownerId) {
           </div>` : ""}
           <div>
             <label class="label">${isChoice ? "정답 설명 (선택)" : "모범 답안"}</label>
-            <textarea class="input" id="a-input" rows="2" placeholder="${isMultiple ? "비워 두면 고른 정답 보기가 자동으로 들어가요" : isOX ? "왜 그런지 적어 주면 좋아요 (안 써도 돼요)" : "모범 답안을 입력하세요"}" style="resize:vertical;">${esc(draft.answer)}</textarea>
+            <textarea class="input" id="a-input" spellcheck="true" lang="ko" rows="2" placeholder="${isMultiple ? "비워 두면 고른 정답 보기가 자동으로 들어가요" : isOX ? "왜 그런지 적어 주면 좋아요 (안 써도 돼요)" : "모범 답안을 입력하세요"}" style="resize:vertical;">${esc(draft.answer)}</textarea>
           </div>
           ${isChoice ? "" : `
           <div>
             <label class="label">정답으로 인정할 답</label>
             <p style="font-size:13px;color:var(--ink-soft);margin:-2px 0 8px;line-height:1.5;">모범 답안과 뜻이 같은 다른 표현을 한 줄에 하나씩 적어요. 예) 세종, 세종 대왕, 이도</p>
-            <textarea class="input" id="acc-input" rows="3" placeholder="한 줄에 하나씩" ${draft.noAccepted ? "disabled" : ""} style="resize:vertical;${draft.noAccepted ? "opacity:.45;" : ""}">${esc(draft.accepted)}</textarea>
+            <textarea class="input" id="acc-input" spellcheck="true" lang="ko" rows="3" placeholder="한 줄에 하나씩" ${draft.noAccepted ? "disabled" : ""} style="resize:vertical;${draft.noAccepted ? "opacity:.45;" : ""}">${esc(draft.accepted)}</textarea>
             <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;color:var(--ink-soft);cursor:pointer;">
               <input type="checkbox" id="no-acc-check" ${draft.noAccepted ? "checked" : ""} style="accent-color:var(--board);width:16px;height:16px;">
               모범 답안만 정답이에요 (다른 답은 인정하지 않아요)
@@ -1288,6 +1431,8 @@ function renderStudentPage(ownerId) {
           </div>`}
         </div>
 
+        ${spellShown ? spellPanelHTML(spellCheckFields(draftSpellFields())) : ""}
+        <button type="button" class="btn btn-ghost" id="spell-btn" style="width:100%;padding:10px;font-size:13px;">맞춤법 검사하기</button>
         ${error ? `<p class="error-box fade-in">${esc(error)}</p>` : ""}
         <div style="display:flex;gap:8px;">
           <button class="btn btn-ghost" id="prev-btn" style="flex:1;">이전</button>
@@ -1396,6 +1541,19 @@ function renderStudentPage(ownerId) {
         draft = { ...emptyQuestion(), subject: draft.subject, type: draft.type };
         removeKey(draftKey); error = ""; paintStep();
       };
+      document.getElementById("spell-btn").onclick = () => { spellShown = true; error = ""; paintStep(); };
+      const spIssues = spellShown ? spellCheckFields(draftSpellFields()) : [];
+      document.querySelectorAll("[data-sp-i]").forEach((b) => b.onclick = () => {
+        const x = spIssues[Number(b.dataset.spI)];
+        const f = draftSpellFields().find((y) => y.key === x.key);
+        if (f) setDraftField(x.key, spellFixOne(f.text, x));
+        paintStep();
+      });
+      const spAll = document.querySelector("[data-sp-all]");
+      if (spAll) spAll.onclick = () => {
+        draftSpellFields().forEach((f) => setDraftField(f.key, spellFixAll(f.text, f.key === "question")));
+        paintStep();
+      };
       document.getElementById("prev-btn").onclick = () => { step = "info"; paintDots(); paintStep(); };
       document.getElementById("submit-btn").onclick = handleSubmit;
     } else if (step === "success") {
@@ -1436,6 +1594,14 @@ function renderStudentPage(ownerId) {
     if (!infoCheck.valid) { error = infoCheck.message; step = "info"; paintDots(); paintStep(); return; }
     const result = validateQuestion(draft);
     if (!result.valid) { error = result.message; paintStep(); return; }
+    // 맞춤법이 틀린 곳이 있으면 한 번 알려 줌 (그대로 한 번 더 누르면 제출)
+    const spKey = JSON.stringify(draftSpellFields().map((f) => f.text));
+    if (spellCheckFields(draftSpellFields()).length && spellAckKey !== spKey) {
+      spellShown = true; spellAckKey = spKey;
+      error = "맞춤법이 틀린 곳이 있는 것 같아요. 고치거나, 이대로 내려면 버튼을 한 번 더 눌러 주세요.";
+      paintStep(); return;
+    }
+    spellShown = false; spellAckKey = null;
 
     const isEssay = draft.type === QUESTION_TYPES.ESSAY;
     const cf = buildChoiceFields(draft);
@@ -1452,7 +1618,11 @@ function renderStudentPage(ownerId) {
     // ---- 이미 낸 문제 고치기 ----
     if (draft.editingId) {
       const h = myHistory().find((x) => x.id === draft.editingId);
-      if (!canEdit(h)) { draft.editingId = ""; saveJSON(draftKey, draft); error = "고칠 문제를 찾지 못했어요. 새 문제로 제출하려면 다시 눌러 주세요."; paintStep(); return; }
+      if (!canEdit(h)) {
+        draft.editingId = ""; saveJSON(draftKey, draft);
+        error = isLocked(h) ? "선생님이 이미 고친 문제라 더 고칠 수 없어요. 새 문제로 내려면 다시 눌러 주세요." : "고칠 문제를 찾지 못했어요. 새 문제로 제출하려면 다시 눌러 주세요.";
+        paintStep(); return;
+      }
       submitting = true; error = ""; paintStep();
       try {
         const newToken = newEditToken();
@@ -1469,7 +1639,7 @@ function renderStudentPage(ownerId) {
         console.error("문제 수정 오류:", err);
         submitting = false;
         error = err && (err.code === "permission-denied" || err.code === "not-found")
-          ? "고칠 수 없어요. 선생님이 문제를 지웠거나 문제 접수가 마감되었을 수 있어요."
+          ? "고칠 수 없어요. 선생님이 이미 고쳤거나 지운 문제, 또는 문제 접수가 마감되었을 수 있어요."
           : "저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
         paintStep();
       }
@@ -3117,7 +3287,11 @@ function renderAdminDashboard(ownerId) {
         clearFeedback(id); // 승인하면 남겨 둔 한마디는 지움
       }
       else if (action === "unapprove") await updateDoc(doc(db, COLLECTIONS.QUESTIONS, id), { isApproved: false });
-      else { await clearFeedback(id); await deleteDoc(doc(db, COLLECTIONS.QUESTIONS, id)); }
+      else {
+        await clearFeedback(id);
+        try { await deleteDoc(doc(db, COLLECTIONS.QUESTION_LOCKS, id)); } catch (e) {}
+        await deleteDoc(doc(db, COLLECTIONS.QUESTIONS, id));
+      }
       showNotice(msg[0]);
       return true;
     } catch (err) { console.error(err); showNotice(msg[1]); return false; }
@@ -3137,8 +3311,22 @@ function renderAdminDashboard(ownerId) {
     // 같은 학생(반·번호·이름이 같음)이 낸 다른 문제
     const sameStudent = questions.filter((x) => x.id !== id && x.class === q.class && String(x.number) === String(q.number) && x.name === q.name);
 
+    const edSpellFields = () => {
+      const f = [{ key: "question", label: "문제", text: ed.question }];
+      if (ed.type === QUESTION_TYPES.MULTIPLE) ed.choices.forEach((c, i) => f.push({ key: `choice${i}`, label: `보기 ${i + 1}`, text: c }));
+      f.push({ key: "answer", label: ed.type === QUESTION_TYPES.ESSAY ? "모범 답안" : "정답 설명", text: ed.answer });
+      if (ed.type === QUESTION_TYPES.ESSAY) f.push({ key: "accepted", label: "인정할 답", text: ed.accepted });
+      return f;
+    };
+    const setEdField = (key, val) => {
+      if (key === "question") ed.question = val;
+      else if (key.startsWith("choice")) ed.choices[Number(key.slice(6))] = val;
+      else if (key === "answer") ed.answer = val;
+      else if (key === "accepted") ed.accepted = val;
+    };
     function paintModal(errMsg = "") {
       const isMultiple = ed.type === QUESTION_TYPES.MULTIPLE;
+      const spIssues = spellCheckFields(edSpellFields());
       const isOX = ed.type === QUESTION_TYPES.OX;
       const unitOptions = [...new Set([...unitsFor(ed.subject, gt), ed.unit].filter(Boolean))];
       const body = openModal("문제 자세히 보기·수정", `
@@ -3188,7 +3376,7 @@ function renderAdminDashboard(ownerId) {
           <div><label class="label" style="font-size:12px;">난이도 <span style="font-weight:600;color:var(--ink-soft);">(안 골라도 됨, 한 번 더 누르면 해제)</span></label>
             <div class="grid3">${DIFFICULTIES.map((d) => `<button type="button" class="pill-btn m-diff ${ed.difficulty === d ? "active" : ""}" data-diff="${d}">${d}</button>`).join("")}</div></div>
           <div><label class="label" style="font-size:12px;">문제</label>
-            <textarea class="input" id="m-question" rows="3" style="resize:vertical;">${esc(ed.question)}</textarea></div>
+            <textarea class="input" id="m-question" spellcheck="true" lang="ko" rows="3" style="resize:vertical;">${esc(ed.question)}</textarea></div>
           ${isMultiple ? `
           <div><label class="label" style="font-size:12px;">보기 (정답 번호를 눌러 고르세요 · 여러 개 가능 · 보기는 ${MIN_CHOICES}개 이상)</label>
             <div style="display:flex;flex-direction:column;gap:8px;">
@@ -3202,9 +3390,10 @@ function renderAdminDashboard(ownerId) {
           <div><label class="label" style="font-size:12px;">정답</label>
             <div class="grid3" style="grid-template-columns:1fr 1fr;">${OX_CHOICES.map((c, i) => `<button type="button" class="pill-btn m-ox ${ed.oxAnswer === String(i + 1) ? "active" : ""}" data-n="${i + 1}" style="font-size:22px;font-weight:800;">${c}</button>`).join("")}</div></div>` : ""}
           <div><label class="label" style="font-size:12px;">${isMultiple || isOX ? "정답 설명 (선택)" : "모범 답안"}</label>
-            <textarea class="input" id="m-answer" rows="2" style="resize:vertical;">${esc(ed.answer)}</textarea></div>
+            <textarea class="input" id="m-answer" spellcheck="true" lang="ko" rows="2" style="resize:vertical;">${esc(ed.answer)}</textarea></div>
           ${isMultiple || isOX ? "" : `<div><label class="label" style="font-size:12px;">정답으로 인정할 답 (한 줄에 하나)</label>
-            <textarea class="input" id="m-accepted" rows="3" style="resize:vertical;">${esc(ed.accepted)}</textarea></div>`}
+            <textarea class="input" id="m-accepted" spellcheck="true" lang="ko" rows="3" style="resize:vertical;">${esc(ed.accepted)}</textarea></div>`}
+          ${spIssues.length ? spellPanelHTML(spIssues) : ""}
           ${errMsg ? `<p class="error-box">${esc(errMsg)}</p>` : ""}
           ${q.isImported ? "" : `
           <div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;">
@@ -3252,6 +3441,15 @@ function renderAdminDashboard(ownerId) {
       });
       body.querySelectorAll(".m-ox").forEach((b) => b.onclick = () => { keep(); ed.oxAnswer = b.dataset.n; paintModal(); });
       body.querySelectorAll(".m-diff").forEach((b) => b.onclick = () => { keep(); ed.difficulty = ed.difficulty === b.dataset.diff ? "" : b.dataset.diff; paintModal(); });
+      body.querySelectorAll("[data-sp-i]").forEach((b) => b.onclick = () => {
+        keep();
+        const x = spIssues[Number(b.dataset.spI)];
+        const f = edSpellFields().find((y) => y.key === x.key);
+        if (f) setEdField(x.key, spellFixOne(f.text, x));
+        paintModal();
+      });
+      const spAll = body.querySelector("[data-sp-all]");
+      if (spAll) spAll.onclick = () => { keep(); edSpellFields().forEach((f) => setEdField(f.key, spellFixAll(f.text, f.key === "question"))); paintModal(); };
       body.querySelectorAll("[data-sim-open]").forEach((b) => b.onclick = () => openQuestionModal(b.dataset.simOpen));
       body.querySelectorAll(".m-fb-tpl").forEach((b) => b.onclick = () => {
         keep(); const t = FB_TEMPLATES[Number(b.dataset.i)];
@@ -3294,20 +3492,29 @@ function renderAdminDashboard(ownerId) {
         const answer = ed.answer.trim() || defaultAnswerFor(ed.type, cf.choices, cf.correctChoices);
         const author = { class: ed.cls, number: number ? String(Number(number)) : "", name };
         const authorChanged = author.class !== q.class || author.number !== String(q.number ?? "") || author.name !== q.name;
-        const update = {
-          ...author,
+        const content = {
           subject: ed.subject, unit: ed.unit, page, type: ed.type, question: ed.question.trim(), answer, difficulty: ed.difficulty,
           acceptedAnswers: ed.type === QUESTION_TYPES.ESSAY ? parseAccepted(ed.accepted).filter((x) => normAnswer(x) !== normAnswer(answer)) : [],
-          ...cf, editedAt: serverTimestamp(),
+          ...cf,
         };
+        // 문제 내용이 실제로 바뀌었는지 (출제자 이름만 바꾼 경우는 '선생님이 고침'으로 치지 않음)
+        const before = { subject: q.subject || "", unit: q.unit || "", page: q.page || "", type: q.type, question: q.question || "", answer: q.answer || "", difficulty: q.difficulty || "",
+          acceptedAnswers: acceptedList(q), choices: q.choices || [], correctChoices: correctList(q), correctChoice: q.correctChoice || "" };
+        const contentChanged = Object.keys(content).some((k) => JSON.stringify(content[k] ?? "") !== JSON.stringify(before[k] ?? ""));
+        const update = contentChanged ? { ...author, ...content, editedAt: serverTimestamp() } : { ...author };
         try {
           const others = authorChanged && ed.renameAll ? sameStudent : [];
           const batch = writeBatch(db);
           batch.update(doc(db, COLLECTIONS.QUESTIONS, id), update);
           others.slice(0, 450).forEach((x) => batch.update(doc(db, COLLECTIONS.QUESTIONS, x.id), author));
           await batch.commit();
+          // 학생이 낸 문제를 선생님이 고쳤으면: 학생은 더 못 고치게 하고, 고친 내용을 학생 화면에 보여 줌
+          if (contentChanged && !q.isImported) {
+            setDoc(doc(db, COLLECTIONS.QUESTION_LOCKS, id), { ownerId, at: serverTimestamp(), data: content })
+              .catch((e) => console.warn("선생님이 고친 표시를 저장하지 못했어요 (Firestore 규칙에 questionLocks가 있는지 확인):", e));
+          }
           closeModal();
-          showNotice(others.length ? `문제를 수정하고, 같은 학생의 다른 문제 ${others.length}개의 출제자도 바꿨습니다.` : "문제를 수정했습니다.");
+          showNotice(others.length ? `문제를 수정하고, 같은 학생의 다른 문제 ${others.length}개의 출제자도 바꿨습니다.` : contentChanged ? "문제를 수정했습니다. (학생은 이 문제를 더 고칠 수 없어요)" : "저장했습니다.");
         }
         catch (err) { console.error(err); paintModal("저장 중 오류가 발생했습니다."); }
       };
